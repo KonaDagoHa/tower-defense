@@ -37,7 +37,7 @@ public class UnitManager : MonoBehaviour
                     unitCollider.height / 2f,
                     Random.Range(-flowField.map.size.y / 2f, flowField.map.size.y / 2f)
                 );
-            } while (Physics.CheckSphere(position, unitCollider.radius, invalidSpawnMask));
+            } while (Physics.CheckSphere(position, unitCollider.height, invalidSpawnMask));
             unit.Initialize(flowField, position);
         }
     }
