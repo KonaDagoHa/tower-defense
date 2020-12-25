@@ -8,12 +8,7 @@ public class UnitManager : MonoBehaviour
 {
     [SerializeField] private GameObject unitPrefab;
     [SerializeField] private FlowField flowField;
-    private int invalidSpawnMask;
-
-    private void Start()
-    {
-        invalidSpawnMask = LayerMask.GetMask("ImpassableTerrain");
-    }
+    [SerializeField] private LayerMask invalidSpawnMask;
 
     private void Update()
     {
