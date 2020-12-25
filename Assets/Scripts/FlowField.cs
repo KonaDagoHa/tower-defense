@@ -6,14 +6,15 @@ using UnityEngine;
 
 public class FlowField : MonoBehaviour
 {
-    [SerializeField] private Map map;
     [SerializeField] private LayerMask defaultTerrain;
     [SerializeField] private LayerMask impassableTerrain;
     [SerializeField] private LayerMask roughTerrain;
     [SerializeField] private float nodeRadius = 0.5f;
     
+    public Map map;
+    public Node[,] grid { get; private set; }
+    
     private Vector2Int gridSize;
-    private Node[,] grid;
     private float nodeDiameter => nodeRadius * 2;
 
     private static class NodeCost
@@ -22,13 +23,6 @@ public class FlowField : MonoBehaviour
         public const byte impassableTerrain = byte.MaxValue;
         public const byte roughTerrain = 4;
     }
-    
-    private readonly Vector2Int[] neighborDirections = {
-        new Vector2Int(0, 1), // north
-        new Vector2Int(1, 0), // east
-        new Vector2Int(0, -1), // south
-        new Vector2Int(-1, 0),  //west
-    };
 
     public Node NodeFromWorldPosition(Vector3 worldPosition)
     {
@@ -36,13 +30,18 @@ public class FlowField : MonoBehaviour
             // percentX = 0 and percentY = 0 is bottom left corner
             // percentX = 1 and percentY = 1 is top right corner
         float percentX = Mathf.Clamp01((worldPosition.x + map.size.x / 2) / map.size.x);
-        float percentY = Mathf.Clamp01((worldPosition.y + map.size.y / 2) / map.size.y);
+        float percentY = Mathf.Clamp01((worldPosition.z + map.size.y / 2) / map.size.y);
 
         // indices of grid
         int x = Mathf.RoundToInt((gridSize.x - 1) * percentX);
         int y = Mathf.RoundToInt((gridSize.y - 1) * percentY);
 
         return grid[x, y];
+    }
+
+    private void Start()
+    {
+        CreateGrid();
     }
 
     private void Update()
@@ -53,25 +52,7 @@ public class FlowField : MonoBehaviour
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit))
             {
-                CreateGrid();
-                CreateCostField();
-                CreateIntegrationField(hit.point);
-                Debug.Log(hit.point);
-            }
-            
-        }
-    }
-
-    private void UpdateNeighbors(Node node)
-    {
-        // find north, east, south, and west neighbors of node and add to node's neighbors list
-        foreach (Vector2Int direction in neighborDirections)
-        {
-            Vector2Int neighborIndex = node.gridIndex + direction;
-            if (neighborIndex.x >= 0 && neighborIndex.x < gridSize.x &&
-                neighborIndex.y >= 0 && neighborIndex.y < gridSize.y)
-            {
-                node.neighbors.Add(grid[neighborIndex.x, neighborIndex.y]);
+                CreateFlowField(hit.point);
             }
         }
     }
@@ -103,7 +84,7 @@ public class FlowField : MonoBehaviour
         // after grid is populated, each node will store references to its neighbors
         foreach (Node node in grid)
         {
-            UpdateNeighbors(node);
+            node.UpdateNeighbors(grid, gridSize);
         }
     }
 
@@ -152,7 +133,7 @@ public class FlowField : MonoBehaviour
         while (openNodes.Count > 0)
         {
             Node currentNode = openNodes.Dequeue();
-            foreach (Node neighbor in currentNode.neighbors)
+            foreach (Node neighbor in currentNode.neighborsCardinal)
             {
                 // don't even bother evaluating impassable nodes to save some time
                 if (neighbor.cost == byte.MaxValue) { continue; }
@@ -168,12 +149,16 @@ public class FlowField : MonoBehaviour
         }
     }
 
-    private void CreateFlowField()
+    private void CreateFlowField(Vector3 targetPosition)
     {
         CreateCostField();
-        //CreateIntegrationField();
+        CreateIntegrationField(targetPosition);
+        foreach (Node node in grid)
+        {
+            node.UpdateFlowVector();
+        }
     }
-    
+    /*
     private void OnDrawGizmos()
     {
         if (grid != null)
@@ -197,7 +182,10 @@ public class FlowField : MonoBehaviour
                     Vector3.one * nodeDiameter
                 );
                 Handles.Label(node.worldPosition, node.integration.ToString());
+                Gizmos.color = Color.white;
+                Gizmos.DrawRay(node.worldPosition, node.flowDirection);
             }
         }
     }
+    */
 }
