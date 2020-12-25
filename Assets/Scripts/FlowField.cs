@@ -4,6 +4,28 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
+/*
+ * How to create a flow field:
+ * (1) CreateGrid()
+ * (2) CreateCostField()
+ * (3) CreateIntegrationField()
+ * (4) foreach node in grid, node.UpdateFlowDirection()
+ * 
+ * Each step depends on the previous step, but not vice versa.
+ * 
+ * EXAMPLE:
+ *     Completing step (1) requires completing steps (2), (3), and (4) immediately afterwards.
+ *     Completing step (4) does NOT require completing steps (1), (2) or (3).
+ * 
+ * Therefore,
+ *     Do step (1) when map.size OR nodeRadius changes.
+ *         Followed by (2), (3), and (4)
+ *     Do step (2) when terrain objects change position
+ *         Followed by (3) and (4)
+ *     Do step (3) when targetPosition (destination of units) changes
+ *         Followed by (4)
+ *     Do step (4) when you want units to use the integration field from step (3)
+ */
 public class FlowField : MonoBehaviour
 {
     [SerializeField] private LayerMask defaultTerrain;
@@ -13,9 +35,12 @@ public class FlowField : MonoBehaviour
     
     public Map map;
     public Node[,] grid { get; private set; }
+    public Node targetNode { get; private set; }
+    public Vector3 targetPosition { get; private set; }
     
     private Vector2Int gridSize;
     private float nodeDiameter => nodeRadius * 2;
+    
 
     private static class NodeCost
     {
@@ -52,7 +77,8 @@ public class FlowField : MonoBehaviour
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit))
             {
-                CreateFlowField(hit.point);
+                targetPosition = hit.point;
+                CreateFlowField();
             }
         }
     }
@@ -115,7 +141,7 @@ public class FlowField : MonoBehaviour
         }
     }
 
-    private void CreateIntegrationField(Vector3 targetPosition)
+    private void CreateIntegrationField()
     {
         // reset integration values of all nodes
         foreach (Node node in grid)
@@ -123,7 +149,7 @@ public class FlowField : MonoBehaviour
             node.integration = ushort.MaxValue;
         }
         // set cost and integration of targetNode to 0
-        Node targetNode = NodeFromWorldPosition(targetPosition);
+        targetNode = NodeFromWorldPosition(targetPosition);
         targetNode.cost = 0;
         targetNode.integration = 0;
         // create queue of open nodes and add target node to it
@@ -149,16 +175,16 @@ public class FlowField : MonoBehaviour
         }
     }
 
-    private void CreateFlowField(Vector3 targetPosition)
+    private void CreateFlowField()
     {
         CreateCostField();
-        CreateIntegrationField(targetPosition);
+        CreateIntegrationField();
         foreach (Node node in grid)
         {
-            node.UpdateFlowVector();
+            node.UpdateFlowDirection();
         }
     }
-    /*
+    
     private void OnDrawGizmos()
     {
         if (grid != null)
@@ -181,11 +207,13 @@ public class FlowField : MonoBehaviour
                     node.worldPosition, 
                     Vector3.one * nodeDiameter
                 );
+                /*
                 Handles.Label(node.worldPosition, node.integration.ToString());
                 Gizmos.color = Color.white;
                 Gizmos.DrawRay(node.worldPosition, node.flowDirection);
+                */
             }
         }
     }
-    */
+    
 }

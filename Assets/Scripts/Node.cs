@@ -57,7 +57,7 @@ public class Node
         }
     }
 
-    public void UpdateFlowVector()
+    public void UpdateFlowDirection()
     {
         Node lowestIntegrationNeighbor = this;
         foreach (Node neighbor in neighborsCardinal)

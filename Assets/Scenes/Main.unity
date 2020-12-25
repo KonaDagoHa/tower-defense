@@ -513,7 +513,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfc4dfb0cacab4acc85f8b4823e7608b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  size: {x: 50, y: 50}
+  size: {x: 100, y: 100}
 --- !u!4 &1476419405
 Transform:
   m_ObjectHideFlags: 0
@@ -584,7 +584,7 @@ MonoBehaviour:
   roughTerrain:
     serializedVersion: 2
     m_Bits: 1024
-  nodeRadius: 0.5
+  nodeRadius: 3
   map: {fileID: 1476419404}
 --- !u!1 &1981327241
 GameObject:
