@@ -5,12 +5,21 @@ using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
+// TODO: implement steering behaviors
+    // http://www.red3d.com/cwr/steer/gdc99/
 // BUG: gravity is extremely weak when unit is moving via flow field
     // FIX: when unit is not grounded, unit goes into ragdoll mode until it is grounded again
         // this may cause problems with jumping 
             // EDIT: units will now turn into ragdolls when feet not grounded. this will not affect jumping because the units
             // should land on their feet after jumping
 // TODO: instead of freezing rotation, allow rotation if unit is hit by something
+// BUG: avoidance behavior makes units shake because units can't decide whether to follow flow field or avoid other units
+    // try implementing rts unit formations
+    // what is the if condition that determines when units should stop following flow field?
+        // if a certain amount of time has passed and unit's current node has not changed,
+            // unit should freeze position
+        // if sqrMagnitude of (previous velocity + current velocity) is less than certain amount, velocity = zero 
+        
 
 public class Unit : MonoBehaviour
 {
@@ -20,10 +29,17 @@ public class Unit : MonoBehaviour
     [SerializeField] private Transform feet;
     private Rigidbody selfRigidbody;
     private Collider selfCollider;
-    private FlowField flowField;
+    
+    // movement
     private float moveSpeed = 5f;
     private Vector3 moveDirection = Vector3.zero;
-    private float avoidanceRadius = 3;
+    private float avoidanceRadius = 1;
+    private Vector3 previousVelocity;
+    
+    // flow field
+    private FlowField flowField;
+    private Node currentNode;
+    private Node previousNode;
     
     // jumping
     private WaitForSeconds jumpDelay = new WaitForSeconds(2); // in seconds
@@ -40,6 +56,8 @@ public class Unit : MonoBehaviour
         selfCollider = GetComponent<Collider>();
         flowField = field;
         transform.localPosition = localPosition;
+        currentNode = flowField.WorldToNode(transform.position);
+
         StartCoroutine(JumpCoolDown());
     }
 
@@ -58,19 +76,32 @@ public class Unit : MonoBehaviour
                 ToggleRagdoll(true);
             }
             else // default behavior (not ragdoll)
+            // else if (!velocityFrozen) then reset velocityFrozen with a coroutine
             {
+                UpdateNode();
                 FollowFlowField();
                 AvoidOtherUnits();
+
+                previousVelocity = selfRigidbody.velocity;
+                
+                // apply velocity to rigidbody
                 if (moveDirection.sqrMagnitude > 1)
                 {
                     moveDirection.Normalize();
                 }
-
                 Vector3 velocityChange = moveDirection * moveSpeed - selfRigidbody.velocity;
                 selfRigidbody.AddForce(velocityChange, ForceMode.VelocityChange);
+
+                // set velocity to zero under this condition
                 Vector3 velocity = selfRigidbody.velocity;
+                if ((previousVelocity + velocity).sqrMagnitude < 0.001f)
+                {
+                    selfRigidbody.AddForce(-velocity, ForceMode.VelocityChange);
+                    Debug.Log("FREEZE!    " + selfRigidbody.velocity);
+                }
+                
                 // rotate unit so that it faces current velocity
-                if (velocity != Vector3.zero)
+                if (selfRigidbody.velocity != Vector3.zero)
                 {
                     Quaternion moveRotation = Quaternion.RotateTowards(
                         transform.rotation,
@@ -83,14 +114,18 @@ public class Unit : MonoBehaviour
         }
     }
 
+    private void UpdateNode()
+    {
+        previousNode = currentNode;
+        currentNode = flowField.WorldToNode(transform.position);
+    }
+
     private void FollowFlowField()
     {
-        Vector3 position = transform.position;
-        Node currentNode = flowField.WorldToNode(position);
         if (currentNode == flowField.targetNode)
         {
             // if currentNode is targetNode, move towards currentNode's center
-            moveDirection = flowField.targetPosition - position;
+            moveDirection = flowField.targetPosition - transform.position;
         }
         else
         {
@@ -98,7 +133,7 @@ public class Unit : MonoBehaviour
             moveDirection = currentNode.flowDirection;
         }
     }
-    
+
     private void AvoidOtherUnits()
     {
         Vector3 position = transform.position;
@@ -113,24 +148,24 @@ public class Unit : MonoBehaviour
                 if (unitCollider != selfCollider)
                 {
                     Vector3 awayFromUnit = position - unitCollider.transform.position;
-                    // this will fix divide by zero errors (happens if two units have same position)
-                    float awayFromUnitSqrMagnitude = awayFromUnit.sqrMagnitude;
-                    if (awayFromUnitSqrMagnitude == 0)
-                    {
-                        awayFromUnitSqrMagnitude = 0.01f;
-                    }
-                    // the closer the unitCollider is, the larger the magnitude of awayFromUnit
-                    awayFromUnit /= awayFromUnitSqrMagnitude;
-                    avoidanceDirection += awayFromUnit;
                     
+                    float awayFromUnitSqrMagnitude = awayFromUnit.sqrMagnitude;
+                    // this will fix divide by zero errors (happens if two units have same position)
+                    if (awayFromUnitSqrMagnitude != 0)
+                    {
+                        // the closer the unitCollider is, the larger the magnitude of awayFromUnit
+                        awayFromUnit /= awayFromUnitSqrMagnitude;
+                        avoidanceDirection += awayFromUnit;
+                    }
+
                 }
 
             }
 
             // Length - 1 because unitsToAvoid includes this unit as well as neighbors
             avoidanceDirection /= unitsToAvoid.Length - 1;
-            
-            moveDirection += avoidanceDirection;
+
+            moveDirection = avoidanceDirection;
         }
     }
 

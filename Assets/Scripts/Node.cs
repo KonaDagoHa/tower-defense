@@ -11,7 +11,7 @@ public class Node
     public List<Node> neighborsCardinal = new List<Node>();
     public List<Node> neighborsIntercardinal = new List<Node>();
     public Vector3 flowDirection = Vector3.zero;
-    
+
     private readonly Vector2Int[] neighborDirectionsCardinal = {
         new Vector2Int(0, 1), // north
         new Vector2Int(1, 0), // east

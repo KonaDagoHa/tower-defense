@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-// TODO: use unit's ground check to make units jump
-// TODO: implement steering behaviors
-    // http://www.red3d.com/cwr/steer/gdc99/
 
 /*
  * How to create a flow field:
