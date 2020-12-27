@@ -2,18 +2,37 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
+
+// BUG: gravity is extremely weak when unit is moving via flow field
+    // FIX: when unit is not grounded, unit goes into ragdoll mode until it is grounded again
+        // this may cause problems with jumping 
+            // EDIT: units will not turn into ragdolls when feet not grounded. this will not affect jumping because the units
+            // should land on their feet after jumping
+// TODO: instead of freezing rotation, allow rotation if unit is hit by something
+// TODO: when unit recovers from ragdoll (feetGrounded) in RecoverFromRagdoll(), interpolate the rotation to be upright
 
 public class Unit : MonoBehaviour
 {
+    [SerializeField] private LayerMask terrainMask;
     [SerializeField] private LayerMask unitsMask;
-    [SerializeField] private Transform groundCheck;
+    [SerializeField] private Transform legs;
+    [SerializeField] private Transform feet;
     private Rigidbody selfRigidbody;
     private Collider selfCollider;
     private FlowField flowField;
     private float moveSpeed = 5f;
     private Vector3 moveDirection = Vector3.zero;
     private float avoidanceRadius = 3;
+    
+    // jumping
+    private WaitForSeconds jumpDelay = new WaitForSeconds(2); // in seconds
+    private bool canJump = true;
+
+    // states
     private bool isRagdoll;
+    private bool feetGrounded => Physics.CheckSphere(feet.position, 0.02f, terrainMask);
+    private bool legsGrounded => Physics.CheckSphere(legs.position, 0.5f, terrainMask);
 
     public void Initialize(FlowField field, Vector3 localPosition)
     {
@@ -21,29 +40,45 @@ public class Unit : MonoBehaviour
         selfCollider = GetComponent<Collider>();
         flowField = field;
         transform.localPosition = localPosition;
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            ToggleRagdoll();
-        }
+        StartCoroutine(JumpCoolDown());
     }
 
     private void FixedUpdate()
     {
-        if (flowField.grid != null && !isRagdoll)
+        // unit turns into ragdoll if and only if feetGrounded == false
+        
+        if (flowField.grid != null)
         {
-            FollowFlowField();
-            AvoidOtherUnits();
-            if (moveDirection.sqrMagnitude > 1)
+            if (isRagdoll)
             {
-                moveDirection.Normalize();
+                RecoverFromRagdoll();
             }
+            else if (!feetGrounded)
+            {
+                TurnOnRagdoll();
+            }
+            else // default behavior (not ragdoll)
+            {
+                FollowFlowField();
+                AvoidOtherUnits();
+                if (moveDirection.sqrMagnitude > 1)
+                {
+                    moveDirection.Normalize();
+                }
 
-            Vector3 velocityChange = moveDirection * moveSpeed - selfRigidbody.velocity;
-            selfRigidbody.AddForce(velocityChange, ForceMode.VelocityChange);
+                Vector3 velocityChange = moveDirection * moveSpeed - selfRigidbody.velocity;
+                selfRigidbody.AddForce(velocityChange, ForceMode.VelocityChange);
+                Vector3 velocity = selfRigidbody.velocity;
+                if (velocity != Vector3.zero)
+                {
+                    Quaternion moveRotation = Quaternion.RotateTowards(
+                        transform.rotation,
+                        Quaternion.LookRotation(new Vector3(velocity.x, 0, velocity.z)),
+                        5
+                    );
+                    selfRigidbody.MoveRotation(moveRotation);
+                }
+            }
         }
     }
 
@@ -77,9 +112,16 @@ public class Unit : MonoBehaviour
                 if (unitCollider != selfCollider)
                 {
                     Vector3 awayFromUnit = position - unitCollider.transform.position;
+                    // this will fix divide by zero errors (happens if two units have same position)
+                    float awayFromUnitSqrMagnitude = awayFromUnit.sqrMagnitude;
+                    if (awayFromUnitSqrMagnitude == 0)
+                    {
+                        awayFromUnitSqrMagnitude = 0.01f;
+                    }
                     // the closer the unitCollider is, the larger the magnitude of awayFromUnit
-                    awayFromUnit /= awayFromUnit.sqrMagnitude;
+                    awayFromUnit /= awayFromUnitSqrMagnitude;
                     avoidanceDirection += awayFromUnit;
+                    
                 }
 
             }
@@ -91,18 +133,68 @@ public class Unit : MonoBehaviour
         }
     }
 
-    private void ToggleRagdoll()
+    private IEnumerator JumpCoolDown()
     {
-        isRagdoll = !isRagdoll;
-        if (isRagdoll)
+        while (true)
         {
-            selfRigidbody.constraints = RigidbodyConstraints.None;
-        }
-        else
-        {
-            selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
-            // get up (if fallen over)
-            selfRigidbody.MoveRotation(Quaternion.Euler(0, 0, 0));
+            if (!canJump)
+            {
+                yield return jumpDelay;
+                canJump = true;
+            }
+            else
+            {
+                yield return null;
+            }
         }
     }
+
+    private void TurnOnRagdoll()
+    {
+        if (!isRagdoll)
+        {
+            isRagdoll = true;
+            selfRigidbody.constraints = RigidbodyConstraints.None;
+        }
+    }
+
+    private void RecoverFromRagdoll()
+    {
+        if (legsGrounded && canJump)
+        {
+            // unit will jump upward at slight angles
+            Vector3 jumpDirection = Quaternion.Euler(
+                Random.Range(-45f, 45f),
+                Random.Range(-45f, 45f),
+                Random.Range(-45f, 45f)) * Vector3.up;
+            selfRigidbody.AddForceAtPosition(jumpDirection * Random.Range(5, 10), feet.position, ForceMode.VelocityChange);
+            canJump = false;
+        }
+        else // unit is in air
+        {
+            // unit try to adjust its rotation to be upright (so that feet can touch ground)
+            Quaternion moveRotation = Quaternion.RotateTowards(
+                transform.rotation,
+                Quaternion.Euler(0, transform.eulerAngles.y, 0),
+                1.5f
+            );
+            selfRigidbody.MoveRotation(moveRotation);
+        }
+        
+        if (feetGrounded)
+        {
+            TurnOffRagdoll();
+        }
+    }
+
+    private void TurnOffRagdoll()
+    {
+        if (isRagdoll)
+        {
+            isRagdoll = false;
+            selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+            selfRigidbody.MoveRotation(Quaternion.Euler(0, transform.eulerAngles.y, 0));
+        }
+    }
+    
 }

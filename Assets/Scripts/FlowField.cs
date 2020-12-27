@@ -38,6 +38,7 @@ public class FlowField : MonoBehaviour
     [SerializeField] private LayerMask impassableTerrain;
     [SerializeField] private LayerMask roughTerrain;
     [SerializeField] private float nodeRadius = 0.5f;
+    [SerializeField] private Transform target;
     public Map map;
     public Node[,] grid { get; private set; }
     public Node targetNode { get; private set; }
@@ -72,8 +73,10 @@ public class FlowField : MonoBehaviour
     {
         CreateGrid();
         CreateCostField();
+        targetPosition = target.position;
+        CreateFlowField();
     }
-    
+    /*
     private void Update()
     {
         if (Input.GetMouseButtonDown(0))
@@ -87,13 +90,13 @@ public class FlowField : MonoBehaviour
             }
         }
     }
-    
+    */
     private void CreateGrid()
     {
         // grid will be centered on the map, but will not necessarily match size of map
         gridSize = new Vector2Int(
-            Mathf.RoundToInt(map.size.x / nodeDiameter),
-            Mathf.RoundToInt(map.size.y / nodeDiameter)
+            Mathf.CeilToInt(map.size.x / nodeDiameter),
+            Mathf.CeilToInt(map.size.y / nodeDiameter)
         );
         grid = new Node[gridSize.x, gridSize.y];
         Vector3 mapBottomLeft = map.bottomLeft;
@@ -188,7 +191,7 @@ public class FlowField : MonoBehaviour
         }
     }
     
-    
+    /*
     private void OnDrawGizmos()
     {
         if (grid != null)
@@ -222,5 +225,5 @@ public class FlowField : MonoBehaviour
             }
         }
     }
-    
+    */
 }
