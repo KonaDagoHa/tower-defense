@@ -2,15 +2,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
 // BUG: gravity is extremely weak when unit is moving via flow field
     // FIX: when unit is not grounded, unit goes into ragdoll mode until it is grounded again
         // this may cause problems with jumping 
-            // EDIT: units will not turn into ragdolls when feet not grounded. this will not affect jumping because the units
+            // EDIT: units will now turn into ragdolls when feet not grounded. this will not affect jumping because the units
             // should land on their feet after jumping
 // TODO: instead of freezing rotation, allow rotation if unit is hit by something
-// TODO: when unit recovers from ragdoll (feetGrounded) in RecoverFromRagdoll(), interpolate the rotation to be upright
 
 public class Unit : MonoBehaviour
 {
@@ -55,7 +55,7 @@ public class Unit : MonoBehaviour
             }
             else if (!feetGrounded)
             {
-                TurnOnRagdoll();
+                ToggleRagdoll(true);
             }
             else // default behavior (not ragdoll)
             {
@@ -69,6 +69,7 @@ public class Unit : MonoBehaviour
                 Vector3 velocityChange = moveDirection * moveSpeed - selfRigidbody.velocity;
                 selfRigidbody.AddForce(velocityChange, ForceMode.VelocityChange);
                 Vector3 velocity = selfRigidbody.velocity;
+                // rotate unit so that it faces current velocity
                 if (velocity != Vector3.zero)
                 {
                     Quaternion moveRotation = Quaternion.RotateTowards(
@@ -149,12 +150,17 @@ public class Unit : MonoBehaviour
         }
     }
 
-    private void TurnOnRagdoll()
+    private void ToggleRagdoll(bool toggleOn)
     {
-        if (!isRagdoll)
+        if (toggleOn && !isRagdoll)
         {
             isRagdoll = true;
             selfRigidbody.constraints = RigidbodyConstraints.None;
+        }
+        else if (!toggleOn && isRagdoll)
+        {
+            isRagdoll = false;
+            selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
         }
     }
 
@@ -167,7 +173,7 @@ public class Unit : MonoBehaviour
                 Random.Range(-45f, 45f),
                 Random.Range(-45f, 45f),
                 Random.Range(-45f, 45f)) * Vector3.up;
-            selfRigidbody.AddForceAtPosition(jumpDirection * Random.Range(5, 10), feet.position, ForceMode.VelocityChange);
+            selfRigidbody.AddForceAtPosition(jumpDirection * Random.Range(5f, 10f), feet.position, ForceMode.VelocityChange);
             canJump = false;
         }
         else // unit is in air
@@ -183,18 +189,8 @@ public class Unit : MonoBehaviour
         
         if (feetGrounded)
         {
-            TurnOffRagdoll();
+            ToggleRagdoll(false);
         }
     }
 
-    private void TurnOffRagdoll()
-    {
-        if (isRagdoll)
-        {
-            isRagdoll = false;
-            selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
-            selfRigidbody.MoveRotation(Quaternion.Euler(0, transform.eulerAngles.y, 0));
-        }
-    }
-    
 }
