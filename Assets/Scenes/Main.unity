@@ -794,7 +794,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1354400383}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 12.97, y: 6.94, z: -0.96}
+  m_LocalPosition: {x: 6.09, y: 0.45, z: -0.96}
   m_LocalScale: {x: 2, y: 1, z: 2}
   m_Children: []
   m_Father: {fileID: 0}
@@ -1176,7 +1176,7 @@ MonoBehaviour:
   roughTerrain:
     serializedVersion: 2
     m_Bits: 1024
-  nodeRadius: 1
+  nodeRadius: 0.5
   target: {fileID: 1354400387}
   map: {fileID: 1476419404}
 --- !u!1 &1981327241
