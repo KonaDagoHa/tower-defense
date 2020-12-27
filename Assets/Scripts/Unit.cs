@@ -6,15 +6,19 @@ using UnityEngine;
 public class Unit : MonoBehaviour
 {
     [SerializeField] private LayerMask unitsMask;
-    private Rigidbody rb;
+    [SerializeField] private Transform groundCheck;
+    private Rigidbody selfRigidbody;
+    private Collider selfCollider;
     private FlowField flowField;
     private float moveSpeed = 5f;
     private Vector3 moveDirection = Vector3.zero;
-    private float avoidanceRadius = 1;
+    private float avoidanceRadius = 3;
+    private bool isRagdoll;
 
     public void Initialize(FlowField field, Vector3 localPosition)
     {
-        rb = GetComponent<Rigidbody>();
+        selfRigidbody = GetComponent<Rigidbody>();
+        selfCollider = GetComponent<Collider>();
         flowField = field;
         transform.localPosition = localPosition;
     }
@@ -29,11 +33,17 @@ public class Unit : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (flowField.grid != null && rb.isKinematic)
+        if (flowField.grid != null && !isRagdoll)
         {
             FollowFlowField();
-            //AvoidOtherUnits();
-            rb.MovePosition(transform.position + moveDirection * (moveSpeed * Time.deltaTime));
+            AvoidOtherUnits();
+            if (moveDirection.sqrMagnitude > 1)
+            {
+                moveDirection.Normalize();
+            }
+
+            Vector3 velocityChange = moveDirection * moveSpeed - selfRigidbody.velocity;
+            selfRigidbody.AddForce(velocityChange, ForceMode.VelocityChange);
         }
     }
 
@@ -41,16 +51,10 @@ public class Unit : MonoBehaviour
     {
         Vector3 position = transform.position;
         Node currentNode = flowField.WorldToNode(position);
-        if (currentNode.cost == FlowField.NodeCost.targetNode)
+        if (currentNode == flowField.targetNode)
         {
             // if currentNode is targetNode, move towards currentNode's center
-            moveDirection = currentNode.worldPosition - position;
-            // moveDirection should only be normalized if magnitude is greater than 1
-            if (moveDirection.sqrMagnitude > 1)
-            {
-                // this will prevent unit from "dashing" toward targetPosition once it touches targetNode
-                moveDirection.Normalize();
-            }
+            moveDirection = flowField.targetPosition - position;
         }
         else
         {
@@ -58,49 +62,47 @@ public class Unit : MonoBehaviour
             moveDirection = currentNode.flowDirection;
         }
     }
-
-    private void ToggleRagdoll()
-    {
-        rb.isKinematic = !rb.isKinematic;
-        if (rb.isKinematic) // switching to kinematic
-        {
-            // get up (if fallen over)
-            rb.MoveRotation(Quaternion.Euler(0, 0, 0));
-        }
-        else // switching to non-kinematic (dynamic)
-        {
-            
-        }
-    }
-
+    
     private void AvoidOtherUnits()
     {
         Vector3 position = transform.position;
         // get all other units within avoidanceRadius
         Collider[] unitsToAvoid = Physics.OverlapSphere(position, avoidanceRadius, unitsMask);
-        Vector3 avoidanceDirection = Vector3.zero;
         if (unitsToAvoid.Length > 1)
         {
-            moveDirection = Vector3.zero;
-
-            if (unitsToAvoid.Length <= 2)
+            Vector3 avoidanceDirection = Vector3.zero;
+            foreach (Collider unitCollider in unitsToAvoid)
             {
-                foreach (Collider unit in unitsToAvoid)
+                // if unitCollider does not belong to the unit calling the function
+                if (unitCollider != selfCollider)
                 {
-                    avoidanceDirection += position - unit.transform.position;
+                    Vector3 awayFromUnit = position - unitCollider.transform.position;
+                    // the closer the unitCollider is, the larger the magnitude of awayFromUnit
+                    awayFromUnit /= awayFromUnit.sqrMagnitude;
+                    avoidanceDirection += awayFromUnit;
                 }
-            
-                avoidanceDirection /= unitsToAvoid.Length;
-                avoidanceDirection = Quaternion.Euler(0, -45, 0) * avoidanceDirection;
-                avoidanceDirection.y = 0;
-            
-                moveDirection = avoidanceDirection;
+
             }
-            else
-            {
-                moveDirection = Vector3.zero;
-            }
+
+            // Length - 1 because unitsToAvoid includes this unit as well as neighbors
+            avoidanceDirection /= unitsToAvoid.Length - 1;
             
+            moveDirection += avoidanceDirection;
+        }
+    }
+
+    private void ToggleRagdoll()
+    {
+        isRagdoll = !isRagdoll;
+        if (isRagdoll)
+        {
+            selfRigidbody.constraints = RigidbodyConstraints.None;
+        }
+        else
+        {
+            selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+            // get up (if fallen over)
+            selfRigidbody.MoveRotation(Quaternion.Euler(0, 0, 0));
         }
     }
 }

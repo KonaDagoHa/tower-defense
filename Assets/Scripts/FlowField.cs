@@ -7,8 +7,6 @@ using UnityEngine;
 // TODO: use unit's ground check to make units obey gravity and not go through floor
 // TODO: implement steering behaviors
     // http://www.red3d.com/cwr/steer/gdc99/
-// TODO: revert changes so there there is only one target node
-    // this will make code simpler
 
 /*
  * How to create a flow field:
@@ -37,20 +35,18 @@ using UnityEngine;
  */
 public class FlowField : MonoBehaviour
 {
-    [SerializeField] private LayerMask defaultTerrain;
     [SerializeField] private LayerMask impassableTerrain;
     [SerializeField] private LayerMask roughTerrain;
-    [SerializeField] private LayerMask targetMask;
     [SerializeField] private float nodeRadius = 0.5f;
     public Map map;
     public Node[,] grid { get; private set; }
-    public List<Node> targetNodes { get; private set; } = new List<Node>();
+    public Node targetNode { get; private set; }
     public Vector3 targetPosition { get; private set; }
     
     private Vector2Int gridSize;
     private float nodeDiameter => nodeRadius * 2;
-    
-    public static class NodeCost
+
+    private static class NodeCost
     {
         public const byte targetNode = 0;
         public const byte defaultTerrain = 1;
@@ -76,10 +72,8 @@ public class FlowField : MonoBehaviour
     private void Start()
     {
         CreateGrid();
-        CreateFlowField();
     }
-
-    /*
+    
     private void Update()
     {
         if (Input.GetMouseButtonDown(0))
@@ -93,7 +87,6 @@ public class FlowField : MonoBehaviour
             }
         }
     }
-    */
     
     private void CreateGrid()
     {
@@ -134,15 +127,7 @@ public class FlowField : MonoBehaviour
             {
                 Node node = grid[x, y];
                 // check for objects that would overlap the node at (x, y) on specific layers
-                if (Physics.CheckSphere(node.worldPosition, nodeRadius, targetMask))
-                {
-                    // even if there are multiple target nodes, there will only be one flow field
-                    // this only works if the target nodes are close to each other relative to map
-                    // else there will be weird behavior
-                    node.cost = NodeCost.targetNode;
-                    targetNodes.Add(node);
-                }
-                else if (Physics.CheckSphere(node.worldPosition, nodeRadius, impassableTerrain))
+                if (Physics.CheckSphere(node.worldPosition, nodeRadius, impassableTerrain))
                 {
                     // node is impassable
                     node.cost = NodeCost.impassableTerrain;
@@ -159,15 +144,6 @@ public class FlowField : MonoBehaviour
                 }
             }
         }
-
-        // set the targetPosition to be the average of all target nodes' worldPositions
-        // WARNING: this means that there should only be ONE target game object else the target position will be inaccurate
-        targetPosition = targetNodes[0].worldPosition;
-        for (int i = 1; i < targetNodes.Count; i++)
-        {
-            targetPosition += targetNodes[i].worldPosition;
-        }
-        targetPosition /= targetNodes.Count;
     }
 
     private void CreateIntegrationField()
@@ -178,7 +154,7 @@ public class FlowField : MonoBehaviour
             node.integration = ushort.MaxValue;
         }
         // set cost and integration of targetNode to 0
-        Node targetNode = WorldToNode(targetPosition);
+        targetNode = WorldToNode(targetPosition);
         targetNode.cost = NodeCost.targetNode;
         targetNode.integration = 0;
         // create queue of open nodes and add target node to it
@@ -214,14 +190,18 @@ public class FlowField : MonoBehaviour
         }
     }
     
-    /*
+    
     private void OnDrawGizmos()
     {
         if (grid != null)
         {
             foreach (Node node in grid)
             {
-                if (node.cost == NodeCost.impassableTerrain)
+                if (node == targetNode)
+                {
+                    Gizmos.color = Color.black;
+                }
+                else if (node.cost == NodeCost.impassableTerrain)
                 {
                     Gizmos.color = Color.red;
                 }
@@ -237,12 +217,12 @@ public class FlowField : MonoBehaviour
                     node.worldPosition, 
                     Vector3.one * nodeDiameter
                 );
-                Handles.Label(node.worldPosition, node.integration.ToString());
-                Gizmos.color = Color.white;
-                Gizmos.DrawRay(node.worldPosition, node.flowDirection);
+                //Handles.Label(node.worldPosition, node.integration.ToString());
+                //Gizmos.color = Color.white;
+                //Gizmos.DrawRay(node.worldPosition, node.flowDirection);
                 
             }
         }
     }
-    */
+    
 }
