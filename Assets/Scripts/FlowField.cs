@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-// TODO: use unit's ground check to make units obey gravity and not go through floor
+// TODO: use unit's ground check to make units jump
 // TODO: implement steering behaviors
     // http://www.red3d.com/cwr/steer/gdc99/
 
@@ -42,7 +42,6 @@ public class FlowField : MonoBehaviour
     public Node[,] grid { get; private set; }
     public Node targetNode { get; private set; }
     public Vector3 targetPosition { get; private set; }
-    
     private Vector2Int gridSize;
     private float nodeDiameter => nodeRadius * 2;
 
@@ -72,6 +71,7 @@ public class FlowField : MonoBehaviour
     private void Start()
     {
         CreateGrid();
+        CreateCostField();
     }
     
     private void Update()
@@ -153,9 +153,8 @@ public class FlowField : MonoBehaviour
         {
             node.integration = ushort.MaxValue;
         }
-        // set cost and integration of targetNode to 0
+        // set integration of targetNode to 0
         targetNode = WorldToNode(targetPosition);
-        targetNode.cost = NodeCost.targetNode;
         targetNode.integration = 0;
         // create queue of open nodes and add target node to it
         Queue<Node> openNodes = new Queue<Node>();
@@ -182,7 +181,6 @@ public class FlowField : MonoBehaviour
 
     private void CreateFlowField()
     {
-        CreateCostField();
         CreateIntegrationField();
         foreach (Node node in grid)
         {
