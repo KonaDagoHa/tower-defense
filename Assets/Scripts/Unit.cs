@@ -17,6 +17,7 @@ using Random = UnityEngine.Random;
 // BUG: avoidance behavior makes units shake because units can't decide whether to follow flow field or avoid other units
     // Solution: follow flow field should be default behavior (only gets activated when there are no other behaviors)
         // OR when only certain other behaviors are active
+    // Solution: use forcemode.force instead of velocity so that velocity is not instantenously changed
         
 
 public class Unit : MonoBehaviour
@@ -27,16 +28,21 @@ public class Unit : MonoBehaviour
     [SerializeField] private Transform feet;
     private Rigidbody selfRigidbody;
     private Collider selfCollider;
+
+    // if moving normally, use Rigidbody.AddForce() with ForceMode.Acceleration
+        // use ForceMode.Force if you want to take mass into account (try this if units are different sizes)
+    // if jumping or dashing, use ForceMode.VelocityChange
+        // use ForceMode.Impulse if you want to take mass into account
     
     // movement
-    private float moveSpeed = 5f;
+    private float maxMoveSpeed = 15f;
     private Vector3 moveDirection = Vector3.zero;
     private float avoidanceRadius = 2;
+    private Collider[] unitsToAvoid = new Collider[5];
 
     // flow field
     private FlowField flowField;
     private Node currentNode;
-    private bool reachedTarget = false;
 
     // jumping
     private WaitForSeconds jumpDelay = new WaitForSeconds(2); // in seconds
@@ -54,8 +60,6 @@ public class Unit : MonoBehaviour
         flowField = field;
         transform.localPosition = localPosition;
         currentNode = flowField.WorldToNode(transform.position);
-
-        StartCoroutine(JumpCoolDown());
     }
 
     private void FixedUpdate()
@@ -83,19 +87,21 @@ public class Unit : MonoBehaviour
                 {
                     moveDirection.Normalize();
                 }
-                Vector3 velocityChange = moveDirection * moveSpeed - selfRigidbody.velocity;
-                selfRigidbody.AddForce(velocityChange, ForceMode.VelocityChange);
+                Vector3 acceleration = moveDirection * maxMoveSpeed - selfRigidbody.velocity;
+                selfRigidbody.AddForce(acceleration, ForceMode.Acceleration);
                 
                 Vector3 velocity = selfRigidbody.velocity;
 
                 // rotate unit so that it faces current velocity
-                if (velocity != Vector3.zero)
+                // but only if the velocity is great enough () prevent units from rapidly rotating back and forth
+                if (velocity.sqrMagnitude > 1)
                 {
+
                     // also makes sure unit is upright
                     Quaternion moveRotation = Quaternion.RotateTowards(
                         transform.rotation,
                         Quaternion.LookRotation(new Vector3(velocity.x, 0, velocity.z)),
-                        5
+                        4
                     );
                     selfRigidbody.MoveRotation(moveRotation);
                 }
@@ -105,20 +111,15 @@ public class Unit : MonoBehaviour
 
     private void FollowFlowField()
     {
-        if (!reachedTarget)
+        if (currentNode == flowField.targetNode)
         {
-            if (currentNode == flowField.targetNode)
-            {
-                // if currentNode is targetNode, move towards targetPosition located inside targetNode
-                moveDirection = flowField.targetPosition - transform.position;
-                reachedTarget = true;
-                StartCoroutine(ReachedTargetCooldown());
-            }
-            else
-            {
-                // if currentNode is NOT targetNode, follow currentNode's flowDirection
-                moveDirection = currentNode.flowDirection;
-            }
+            // if currentNode is targetNode, move towards targetPosition located inside targetNode
+            moveDirection = (flowField.targetPosition - transform.position).normalized;
+        }
+        else
+        {
+            // if currentNode is NOT targetNode, follow currentNode's flowDirection
+            moveDirection = currentNode.flowDirection;
         }
     }
 
@@ -126,12 +127,13 @@ public class Unit : MonoBehaviour
     {
         Vector3 position = transform.position;
         // get all other units within avoidanceRadius
-        Collider[] unitsToAvoid = Physics.OverlapSphere(position, avoidanceRadius, unitsMask);
-        if (unitsToAvoid.Length > 1)
+        int numUnitsToAvoid = Physics.OverlapSphereNonAlloc(position, avoidanceRadius, unitsToAvoid, unitsMask);
+        if (numUnitsToAvoid > 1)
         {
             Vector3 avoidanceDirection = Vector3.zero;
-            foreach (Collider unitCollider in unitsToAvoid)
+            for (int i = 0; i < numUnitsToAvoid; i++)
             {
+                Collider unitCollider = unitsToAvoid[i];
                 // if unitCollider does not belong to the unit calling the function
                 if (unitCollider != selfCollider)
                 {
@@ -145,43 +147,33 @@ public class Unit : MonoBehaviour
                         awayFromUnit /= awayFromUnitMagnitude;
                         avoidanceDirection += awayFromUnit;
                     }
-
                 }
-
             }
 
             // Length - 1 because unitsToAvoid includes this unit as well as neighbors
             // this also normalizes avoidanceDirection because each awayFromUnit vector became a unit vector upon
                 // dividing by its magnitude
-            avoidanceDirection /= unitsToAvoid.Length - 1;
-            
+            avoidanceDirection /= numUnitsToAvoid - 1;
+
             moveDirection += avoidanceDirection;
         }
     }
 
     private IEnumerator JumpCoolDown()
     {
-        while (true)
-        {
-            if (!canJump)
-            {
-                yield return jumpDelay;
-                canJump = true;
-            }
-            else
-            {
-                yield return null;
-            }
-        }
+        yield return jumpDelay;
+        canJump = true;
     }
 
-    private IEnumerator ReachedTargetCooldown()
+    private void Jump(Vector3 velocityChange)
     {
-        if (reachedTarget)
+        if (canJump)
         {
-            yield return new WaitForSeconds(2);
-            reachedTarget = false;
+            selfRigidbody.AddForceAtPosition(velocityChange, feet.position, ForceMode.VelocityChange);
+            canJump = false;
+            StartCoroutine(JumpCoolDown());
         }
+        
     }
 
     private void ToggleRagdoll(bool toggleOn)
@@ -207,8 +199,8 @@ public class Unit : MonoBehaviour
                 Random.Range(-45f, 45f),
                 Random.Range(-45f, 45f),
                 Random.Range(-45f, 45f)) * Vector3.up;
-            selfRigidbody.AddForceAtPosition(jumpDirection * Random.Range(5f, 10f), feet.position, ForceMode.VelocityChange);
-            canJump = false;
+            Vector3 velocityChange = jumpDirection * Random.Range(5f, 10f);
+            Jump(velocityChange);
         }
         else // unit is in air
         {
