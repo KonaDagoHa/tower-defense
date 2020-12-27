@@ -188,7 +188,7 @@ public class FlowField : MonoBehaviour
         }
     }
     
-    /*
+    
     private void OnDrawGizmos()
     {
         if (grid != null)
@@ -222,5 +222,5 @@ public class FlowField : MonoBehaviour
             }
         }
     }
-    */
+    
 }

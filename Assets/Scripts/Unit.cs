@@ -8,17 +8,8 @@ using Random = UnityEngine.Random;
 // TODO: implement steering behaviors
     // http://www.red3d.com/cwr/steer/gdc99/
     // do this in a separate class
-// BUG: gravity is extremely weak when unit is moving via flow field
-    // FIX: when unit is not grounded, unit goes into ragdoll mode until it is grounded again
-        // this may cause problems with jumping 
-            // EDIT: units will now turn into ragdolls when feet not grounded. this will not affect jumping because the units
-            // should land on their feet after jumping
 // TODO: instead of freezing rotation, allow rotation if unit is hit by something
-// BUG: avoidance behavior makes units shake because units can't decide whether to follow flow field or avoid other units
-    // Solution: follow flow field should be default behavior (only gets activated when there are no other behaviors)
-        // OR when only certain other behaviors are active
-    // Solution: use forcemode.force instead of velocity so that velocity is not instantenously changed
-        
+
 
 public class Unit : MonoBehaviour
 {
@@ -30,8 +21,10 @@ public class Unit : MonoBehaviour
     private Collider selfCollider;
 
     // if moving normally, use Rigidbody.AddForce() with ForceMode.Acceleration
+        // this is like doing selfRigidbody.velocity = 
         // use ForceMode.Force if you want to take mass into account (try this if units are different sizes)
     // if jumping or dashing, use ForceMode.VelocityChange
+        // this is like doing selfRigidbody.velocity +=
         // use ForceMode.Impulse if you want to take mass into account
     
     // movement
@@ -52,6 +45,8 @@ public class Unit : MonoBehaviour
     private bool isRagdoll;
     private bool feetGrounded => Physics.CheckSphere(feet.position, 0.02f, terrainMask);
     private bool legsGrounded => Physics.CheckSphere(legs.position, 0.5f, terrainMask);
+    private float initialRagdollAngularSpeed => Random.Range(5f, 10f);
+    private float ragdollRecoveryJumpSpeed => Random.Range(5f, 10f);
 
     public void Initialize(FlowField field, Vector3 localPosition)
     {
@@ -106,6 +101,15 @@ public class Unit : MonoBehaviour
                     selfRigidbody.MoveRotation(moveRotation);
                 }
             }
+        }
+    }
+
+    private void OnCollisionEnter(Collision other)
+    {
+        if (other.gameObject.layer == LayerMask.NameToLayer("Projectile"))
+        {
+            ToggleRagdoll(true);
+            selfRigidbody.AddTorque(Random.insideUnitSphere * initialRagdollAngularSpeed, ForceMode.VelocityChange);
         }
     }
 
@@ -199,7 +203,7 @@ public class Unit : MonoBehaviour
                 Random.Range(-45f, 45f),
                 Random.Range(-45f, 45f),
                 Random.Range(-45f, 45f)) * Vector3.up;
-            Vector3 velocityChange = jumpDirection * Random.Range(5f, 10f);
+            Vector3 velocityChange = jumpDirection * ragdollRecoveryJumpSpeed;
             Jump(velocityChange);
         }
         else // unit is in air
