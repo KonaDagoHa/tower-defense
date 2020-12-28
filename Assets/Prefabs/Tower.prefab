@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 9039774863779170554}
   - component: {fileID: 8108082185424601921}
   - component: {fileID: 7467480139638719049}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Cylinder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -94,6 +94,50 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
+--- !u!1 &567300815784639788
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8157478329968912556}
+  - component: {fileID: 5159713825047619732}
+  m_Layer: 0
+  m_Name: Detection Range
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8157478329968912556
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 567300815784639788}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 888064589557814838}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &5159713825047619732
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 567300815784639788}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 1
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 5
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1650754288562707190
 GameObject:
   m_ObjectHideFlags: 0
@@ -106,7 +150,7 @@ GameObject:
   - component: {fileID: 4699355410975602723}
   - component: {fileID: 5101023896649775309}
   - component: {fileID: 6696152775906261862}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Cylinder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -197,7 +241,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4362401486214834729}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Shooter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -219,7 +263,7 @@ Transform:
   - {fileID: 1284741021272193119}
   - {fileID: 5725995101831250056}
   m_Father: {fileID: 888064589557814838}
-  m_RootOrder: 1
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4511747280050880652
 GameObject:
@@ -230,7 +274,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2545597291276580485}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Base
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -251,7 +295,7 @@ Transform:
   - {fileID: 4065870105048669767}
   - {fileID: 7469378224378261555}
   m_Father: {fileID: 888064589557814838}
-  m_RootOrder: 0
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4586252308594051730
 GameObject:
@@ -265,7 +309,7 @@ GameObject:
   - component: {fileID: 8888810018848502973}
   - component: {fileID: 3642225545955283224}
   - component: {fileID: 1320528049539496872}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Cylinder (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -359,7 +403,7 @@ GameObject:
   - component: {fileID: 314070158401501899}
   - component: {fileID: 136936156565982610}
   - component: {fileID: 2552720145610504182}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Cylinder (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -450,7 +494,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5725995101831250056}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Projectile Origin
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -499,6 +543,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
+  - {fileID: 8157478329968912556}
   - {fileID: 2545597291276580485}
   - {fileID: 4362401486214834729}
   m_Father: {fileID: 0}
