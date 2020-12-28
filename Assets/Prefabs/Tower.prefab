@@ -136,7 +136,7 @@ SphereCollider:
   m_IsTrigger: 1
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 5
+  m_Radius: 10
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1650754288562707190
 GameObject:
@@ -561,9 +561,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a038c8c9c9aa4cfc870c17ad52a2822, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  unitsMask:
-    serializedVersion: 2
-    m_Bits: 2048
   projectilePrefab: {fileID: 1071644910272813198, guid: a138e5fa920d54a7eaa0431a7058524b,
     type: 3}
   projectileOrigin: {fileID: 5725995101831250056}

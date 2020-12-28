@@ -9,6 +9,7 @@ using Random = UnityEngine.Random;
     // http://www.red3d.com/cwr/steer/gdc99/
     // do this in a separate class
 // TODO: instead of freezing rotation, allow rotation if unit is hit by something
+// TODO: call OverlapSphere every 10 frames rather than every frame to save peformance
 
 
 public class Unit : MonoBehaviour
