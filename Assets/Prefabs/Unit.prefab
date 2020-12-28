@@ -199,6 +199,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1012953253265643731}
   - component: {fileID: 4044253269274488642}
+  - component: {fileID: 2689181064426412817}
   - component: {fileID: 3251834414880016050}
   - component: {fileID: 4616756874032339884}
   m_Layer: 11
@@ -245,6 +246,18 @@ MonoBehaviour:
     m_Bits: 2048
   legs: {fileID: 5738485023216624559}
   feet: {fileID: 6758651063004717972}
+--- !u!114 &2689181064426412817
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8388923566590776302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1acbf03d01614dcf9a46f8dc30666fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!136 &3251834414880016050
 CapsuleCollider:
   m_ObjectHideFlags: 0

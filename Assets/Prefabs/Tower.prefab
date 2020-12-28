@@ -94,50 +94,6 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
---- !u!1 &567300815784639788
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8157478329968912556}
-  - component: {fileID: 5159713825047619732}
-  m_Layer: 0
-  m_Name: Detection Range
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &8157478329968912556
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 567300815784639788}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children: []
-  m_Father: {fileID: 888064589557814838}
-  m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &5159713825047619732
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 567300815784639788}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 1
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 10
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1650754288562707190
 GameObject:
   m_ObjectHideFlags: 0
@@ -263,7 +219,7 @@ Transform:
   - {fileID: 1284741021272193119}
   - {fileID: 5725995101831250056}
   m_Father: {fileID: 888064589557814838}
-  m_RootOrder: 2
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4511747280050880652
 GameObject:
@@ -295,7 +251,7 @@ Transform:
   - {fileID: 4065870105048669767}
   - {fileID: 7469378224378261555}
   m_Father: {fileID: 888064589557814838}
-  m_RootOrder: 1
+  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4586252308594051730
 GameObject:
@@ -386,7 +342,7 @@ CapsuleCollider:
   m_GameObject: {fileID: 4586252308594051730}
   m_Material: {fileID: 0}
   m_IsTrigger: 0
-  m_Enabled: 1
+  m_Enabled: 0
   m_Radius: 0.5000001
   m_Height: 2
   m_Direction: 1
@@ -543,7 +499,6 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
-  - {fileID: 8157478329968912556}
   - {fileID: 2545597291276580485}
   - {fileID: 4362401486214834729}
   m_Father: {fileID: 0}
@@ -561,6 +516,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a038c8c9c9aa4cfc870c17ad52a2822, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  unitsMask:
+    serializedVersion: 2
+    m_Bits: 2048
   projectilePrefab: {fileID: 1071644910272813198, guid: a138e5fa920d54a7eaa0431a7058524b,
     type: 3}
   projectileOrigin: {fileID: 5725995101831250056}
