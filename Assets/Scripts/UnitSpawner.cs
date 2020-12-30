@@ -7,7 +7,9 @@ using Random = UnityEngine.Random;
 public class UnitSpawner : MonoBehaviour
 {
     [SerializeField] private GameObject unitPrefab;
-    [SerializeField] private FlowField flowField;
+    public Map map;
+    public FlowField flowField;
+
 
     private void Update()
     {
@@ -21,9 +23,9 @@ public class UnitSpawner : MonoBehaviour
     {
         for (int i = 0; i < count; i++)
         {
-            Unit unit = Instantiate(unitPrefab, transform).GetComponent<Unit>();
+            GameObject unitGO = Instantiate(unitPrefab, transform);
             Vector3 localSpawnPosition = Vector3.zero; // spawn position of unit relative to unit spawner
-            unit.Initialize(flowField, localSpawnPosition);
+            unitGO.transform.localPosition = localSpawnPosition;
         }
     }
 }

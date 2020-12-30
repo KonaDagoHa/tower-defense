@@ -11,14 +11,12 @@ using UnityEngine.UIElements;
     // this is like doing selfRigidbody.velocity +=
     // use ForceMode.Impulse if you want to take mass into account
 
-// BUG: AvoidUnits steering behavior somehow overwrites FollowFlowField and vice versa
-// it seems like if both behaviors are active at once, they cancel out the velocity to zero
 
 [RequireComponent(typeof(Unit))]
 public class UnitMovement : MonoBehaviour
 {
     [SerializeField] private LayerMask unitsMask;
-    [SerializeField] private MovementWeights weights = new MovementWeights();
+    [SerializeField] private SteeringWeights weights = new SteeringWeights();
 
     private Unit selfUnit;
     private Rigidbody selfRigidbody;
@@ -30,26 +28,34 @@ public class UnitMovement : MonoBehaviour
     private Node currentNode;
     
     // unit detection
-    private Collider[] unitsDetected = new Collider[5];
+    private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
-    private float detectionRadius = 4;
-    private float avoidanceRadius = 1.5f;
+    private float detectionRadius = 2;
+    private float avoidanceRadius = 2;
+    private float avoidanceFOV = 60; // unit must be within this field of view angle to be avoided
 
     // movement
     private float maxMoveSpeed = 15f;
+    private float maxRotationSpeed = 200; // in degrees per second
 
+    // steering
     [Serializable]
-    public class MovementWeights
+    public class SteeringWeights
     {
-        public float followFlowField = 1;
+        public float flowField = 1;
         public float avoidUnits = 1;
     }
 
-    public void Initialize()
+    private void Awake()
     {
         selfUnit = GetComponent<Unit>();
-        map = selfUnit.map;
-        flowField = selfUnit.flowField;
+        UnitSpawner spawner = GetComponentInParent<UnitSpawner>();
+        map = spawner.map;
+        flowField = spawner.flowField;
+    }
+
+    private void Start()
+    {
         selfRigidbody = selfUnit.selfRigidbody;
         selfCollider = selfUnit.selfCollider;
         currentNode = map.WorldToNode(transform.position);
@@ -57,7 +63,7 @@ public class UnitMovement : MonoBehaviour
 
     private void Update()
     {
-        if (Utilities.FrameIsDivisibleBy(60))
+        if (Utilities.FrameIsDivisibleBy(30))
         {
             if (!selfUnit.isRagdoll)
             {
@@ -83,16 +89,15 @@ public class UnitMovement : MonoBehaviour
             Vector3 velocityChange = steeredVelocity - selfRigidbody.velocity;
             selfRigidbody.AddForce(velocityChange, ForceMode.Acceleration);
 
-
             // rotate unit so that it faces current velocity
-            // but only if the velocityChange is great enough () prevent units from rapidly rotating back and forth
-            if (steeredVelocity.x != 0 || steeredVelocity.z != 0)
+            // but only if velocity is high enough (reduces shaking rapid when avoiding multiple objects)
+            if (velocityChange.sqrMagnitude > 100)
             {
                 // also makes sure unit is upright
                 Quaternion moveRotation = Quaternion.RotateTowards(
                     transform.rotation,
                     Quaternion.LookRotation(new Vector3(steeredVelocity.x, 0, steeredVelocity.z)),
-                    4
+                    maxRotationSpeed * Time.deltaTime
                 );
                 selfRigidbody.MoveRotation(moveRotation);
             }
@@ -104,10 +109,12 @@ public class UnitMovement : MonoBehaviour
     private Vector3 SteeredVelocity()
     {
         Vector3 velocity = selfRigidbody.velocity;
-        velocity = FollowFlowField(velocity);
-        velocity = AvoidUnits(velocity);
-
-        if (velocity.sqrMagnitude > 1)
+        Vector3 steering = Vector3.zero;
+        steering += FlowFieldSteering(velocity) * weights.flowField;
+        steering += AvoidUnitsSteering(velocity) * weights.avoidUnits;
+        velocity += steering;
+        
+        if (velocity.sqrMagnitude > maxMoveSpeed * maxMoveSpeed)
         {
             velocity = velocity.normalized * maxMoveSpeed;
         }
@@ -115,7 +122,7 @@ public class UnitMovement : MonoBehaviour
         return velocity;
     }
     
-    private Vector3 FollowFlowField(Vector3 velocityToSteer)
+    private Vector3 FlowFieldSteering(Vector3 velocityToSteer)
     {
         Vector3 desiredVelocity;
         if (currentNode == flowField.targetNode)
@@ -135,10 +142,10 @@ public class UnitMovement : MonoBehaviour
         }
 
         desiredVelocity *= maxMoveSpeed;
-        return (desiredVelocity - velocityToSteer) * weights.followFlowField;
+        return desiredVelocity - velocityToSteer; // return the velocity needed to steer towards desired velocity
     }
     
-    private Vector3 AvoidUnits(Vector3 velocityToSteer)
+    private Vector3 AvoidUnitsSteering(Vector3 velocityToSteer)
     {
         if (numUnitsDetected > 1)
         {
@@ -156,10 +163,16 @@ public class UnitMovement : MonoBehaviour
                     // if awayFromUnit is not a zero vector AND the unit is within avoidanceRadius
                     if (awayFromUnitMagnitude != 0 && awayFromUnitMagnitude <= avoidanceRadius)
                     {
-                        numUnitsToAvoid++;
-                        // the closer the unitCollider is, the larger the magnitude of awayFromUnit
-                        awayFromUnit /= awayFromUnitMagnitude;
-                        desiredVelocity += awayFromUnit;
+                        // check if unit is within field of view
+                        Vector3 towardsUnit = -awayFromUnit;
+                        float angleToUnit = Vector3.Angle(transform.forward, towardsUnit);
+                        if (angleToUnit <= avoidanceFOV)
+                        {
+                            numUnitsToAvoid++;
+                            // the closer the unitCollider is, the larger the magnitude of awayFromUnit
+                            awayFromUnit /= awayFromUnitMagnitude;
+                            desiredVelocity += awayFromUnit;
+                        }
                     }
                 }
             }
@@ -168,12 +181,12 @@ public class UnitMovement : MonoBehaviour
             {
                 desiredVelocity /= numUnitsToAvoid;
                 desiredVelocity *= maxMoveSpeed;
-                return (desiredVelocity - velocityToSteer) * weights.avoidUnits;
+                return desiredVelocity - velocityToSteer;
             }
         }
 
         // if this statement is reached, it means there were no units within avoidance radius
-        return velocityToSteer;
+        return Vector3.zero;
     }
 
 }

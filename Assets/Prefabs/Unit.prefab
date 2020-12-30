@@ -259,7 +259,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 2048
   weights:
-    followFlowField: 1
+    flowField: 1
     avoidUnits: 1
 --- !u!136 &3251834414880016050
 CapsuleCollider:

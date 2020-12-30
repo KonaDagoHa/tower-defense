@@ -19,14 +19,7 @@ public class Unit : MonoBehaviour
     [SerializeField] private Transform feet;
     public Rigidbody selfRigidbody { get; private set; }
     public Collider selfCollider { get; private set; }
-    
-    // map
-    public Map map { get; private set; }
-    public FlowField flowField { get; private set; }
-    
-    // movement
-    private UnitMovement movement;
-    
+
     // jumping
     private WaitForSeconds jumpDelay = new WaitForSeconds(2); // in seconds
     private bool canJump = true;
@@ -35,37 +28,29 @@ public class Unit : MonoBehaviour
     public bool isRagdoll { get; private set; }
     private bool feetGrounded => Physics.CheckSphere(feet.position, 0.05f, terrainMask);
     private bool legsGrounded => Physics.CheckSphere(legs.position, 0.5f, terrainMask);
-    private float initialRagdollAngularSpeed => Random.Range(5f, 10f);
-    private float ragdollRecoveryJumpSpeed => Random.Range(5f, 10f);
+    private float initialRagdollAngularSpeed => Random.Range(5f, 10f); // this is used when hit by projectile
+    private float ragdollRecoveryJumpSpeed => Random.Range(5f, 10f); // increase to increase recovery speed
+    private float ragdollRecoveryRotationSpeed = 50; // in degrees per second (increase to increase recovery speed)
 
-    public void Initialize(FlowField f, Vector3 localPosition)
+    public void Awake()
     {
         selfRigidbody = GetComponent<Rigidbody>();
         selfCollider = GetComponent<Collider>();
-        transform.localPosition = localPosition;
-        flowField = f;
-        map = flowField.map;
-
-        movement = GetComponent<UnitMovement>();
-        movement.Initialize();
     }
 
     private void FixedUpdate()
     {
         // unit turns into ragdoll if and only if feetGrounded == false
-        
-        if (map.grid != null)
+        if (isRagdoll)
         {
-            if (isRagdoll)
-            {
-                RecoverFromRagdoll();
-            }
-            else if (!feetGrounded)
-            {
-                ToggleRagdoll(true);
-            }
+            RecoverFromRagdoll();
+        }
+        else if (!feetGrounded)
+        {
+            ToggleRagdoll(true);
         }
     }
+
 
     private void OnCollisionEnter(Collision other)
     {
@@ -125,7 +110,7 @@ public class Unit : MonoBehaviour
             Quaternion moveRotation = Quaternion.RotateTowards(
                 transform.rotation,
                 Quaternion.Euler(0, transform.eulerAngles.y, 0),
-                1.5f
+                ragdollRecoveryRotationSpeed * Time.deltaTime
             );
             selfRigidbody.MoveRotation(moveRotation);
         }
