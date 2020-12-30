@@ -241,9 +241,6 @@ MonoBehaviour:
   terrainMask:
     serializedVersion: 2
     m_Bits: 1792
-  unitsMask:
-    serializedVersion: 2
-    m_Bits: 2048
   legs: {fileID: 5738485023216624559}
   feet: {fileID: 6758651063004717972}
 --- !u!114 &2689181064426412817
@@ -258,6 +255,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c1acbf03d01614dcf9a46f8dc30666fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  unitsMask:
+    serializedVersion: 2
+    m_Bits: 2048
+  weights:
+    followFlowField: 1
+    avoidUnits: 1
 --- !u!136 &3251834414880016050
 CapsuleCollider:
   m_ObjectHideFlags: 0

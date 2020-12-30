@@ -15,7 +15,6 @@ using Random = UnityEngine.Random;
 public class Unit : MonoBehaviour
 {
     [SerializeField] private LayerMask terrainMask;
-    [SerializeField] private LayerMask unitsMask;
     [SerializeField] private Transform legs;
     [SerializeField] private Transform feet;
     public Rigidbody selfRigidbody { get; private set; }
