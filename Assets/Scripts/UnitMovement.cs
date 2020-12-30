@@ -19,7 +19,8 @@ public class UnitMovement : MonoBehaviour
     private Rigidbody selfRigidbody;
     private Collider selfCollider;
 
-    // flow field
+    // map
+    private Map map;
     private FlowField flowField;
     private Node currentNode;
     
@@ -35,10 +36,11 @@ public class UnitMovement : MonoBehaviour
     public void Initialize()
     {
         selfUnit = GetComponent<Unit>();
+        map = selfUnit.map;
         flowField = selfUnit.flowField;
         selfRigidbody = selfUnit.selfRigidbody;
         selfCollider = selfUnit.selfCollider;
-        currentNode = flowField.WorldToNode(transform.position);
+        currentNode = map.WorldToNode(transform.position);
     }
 
     private void Update()
@@ -60,9 +62,9 @@ public class UnitMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (flowField.grid != null && !selfUnit.isRagdoll)
+        if (map.grid != null && !selfUnit.isRagdoll)
         {
-            currentNode = flowField.WorldToNode(transform.position);
+            currentNode = map.WorldToNode(transform.position);
             Vector3 moveDirection = Vector3.zero;
             moveDirection += FollowFlowField();
             moveDirection += AvoidOtherUnits();

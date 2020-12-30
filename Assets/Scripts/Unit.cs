@@ -21,7 +21,8 @@ public class Unit : MonoBehaviour
     public Rigidbody selfRigidbody { get; private set; }
     public Collider selfCollider { get; private set; }
     
-    // flow field
+    // map
+    public Map map { get; private set; }
     public FlowField flowField { get; private set; }
     
     // movement
@@ -44,6 +45,7 @@ public class Unit : MonoBehaviour
         selfCollider = GetComponent<Collider>();
         transform.localPosition = localPosition;
         flowField = f;
+        map = flowField.map;
 
         movement = GetComponent<UnitMovement>();
         movement.Initialize();
@@ -53,7 +55,7 @@ public class Unit : MonoBehaviour
     {
         // unit turns into ragdoll if and only if feetGrounded == false
         
-        if (flowField.grid != null)
+        if (map.grid != null)
         {
             if (isRagdoll)
             {

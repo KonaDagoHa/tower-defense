@@ -2,8 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
-// TODO: make it so tower linearly rotates towards unit before shooting
+using Random = UnityEngine.Random;
 
 public class Tower : MonoBehaviour
 {
@@ -11,19 +10,22 @@ public class Tower : MonoBehaviour
     [SerializeField] private GameObject projectilePrefab;
     [SerializeField] private Transform projectileOrigin;
     [SerializeField] private Transform shooter;
-    private WaitForSeconds shootDelay = new WaitForSeconds(0.1f);
-    private float projectileSpeed = 15;
-    private float destroyProjectileTime = 1;
-    private bool canShoot = true;
-    private float aimSpeed = 200;
     
-    // shooting
+    // aiming
+    private float aimSpeed = 150;
     private Collider unitToShoot;
-    
+
+    // shooting
+    private WaitForSeconds shootRate = new WaitForSeconds(1);
+    private bool canShoot = true;
+    private float projectileSpeed = 10;
+    private float destroyProjectileTime = 1;
+
     // unit detection
     private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
-    private float detectionRadius = 10;
+    private float detectionRadius = 20;
+    
     
     private void Update()
     {
@@ -36,7 +38,7 @@ public class Tower : MonoBehaviour
                 unitsDetected, 
                 unitsMask
             );
-
+            
             unitToShoot = ClosestUnitDetected();
         }
 
@@ -72,8 +74,9 @@ public class Tower : MonoBehaviour
 
     private void AimShooterTowards(Collider unit)
     {
-        Vector3 shootDirection = (unit.ClosestPoint(projectileOrigin.position) - shooter.position).normalized;
-        
+        //float randomDeviation = Random.
+        Vector3 shootDirection = (PredictedUnitPosition(unit) - shooter.position).normalized;
+
         shooter.rotation = Quaternion.RotateTowards(
             shooter.rotation,
             Quaternion.LookRotation(shootDirection),
@@ -84,6 +87,18 @@ public class Tower : MonoBehaviour
         {
             ShootProjectile(shootDirection);
         }
+    }
+
+    private Vector3 PredictedUnitPosition(Collider unit)
+    {
+        Vector3 origin = projectileOrigin.position;
+        Vector3 unitClosestPoint = unit.ClosestPoint(origin);
+        Vector3 unitCurrentVelocity = unit.attachedRigidbody.velocity;
+
+        float distanceToUnit = (unitClosestPoint - origin).magnitude;
+        float projectileTimeToUnit = distanceToUnit / projectileSpeed;
+        
+        return unitClosestPoint + unitCurrentVelocity * projectileTimeToUnit;
     }
 
     private void ShootProjectile(Vector3 shootDirection)
@@ -102,7 +117,7 @@ public class Tower : MonoBehaviour
 
     private IEnumerator ShootCooldown()
     {
-        yield return shootDelay;
+        yield return shootRate;
         canShoot = true;
     }
 }
