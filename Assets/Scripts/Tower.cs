@@ -12,21 +12,20 @@ public class Tower : MonoBehaviour
     [SerializeField] private Transform shooter;
     
     // aiming
-    private float aimSpeed = 150;
+    private float aimSpeed = 100;
     private Collider unitToShoot;
 
     // shooting
     private WaitForSeconds shootRate = new WaitForSeconds(1);
     private bool canShoot = true;
-    private float projectileSpeed = 10;
-    private float destroyProjectileTime = 1;
+    private float projectileSpeed = 20;
+    private float destroyProjectileTime = 5;
 
     // unit detection
     private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
-    private float detectionRadius = 20;
-    
-    
+    private float detectionRadius = 30;
+
     private void Update()
     {
         if (Utilities.FrameIsDivisibleBy(30))
@@ -74,41 +73,47 @@ public class Tower : MonoBehaviour
 
     private void AimShooterTowards(Collider unit)
     {
-        //float randomDeviation = Random.
-        Vector3 shootDirection = (PredictedUnitPosition(unit) - shooter.position).normalized;
+        Vector3 direction = DirectionToShoot(unit);
 
         shooter.rotation = Quaternion.RotateTowards(
             shooter.rotation,
-            Quaternion.LookRotation(shootDirection),
+            Quaternion.LookRotation(direction),
             aimSpeed * Time.deltaTime
             );
-        
-        if (shooter.forward == shootDirection)
+
+        if (shooter.forward == direction)
         {
-            ShootProjectile(shootDirection);
+            ShootProjectile(direction);
         }
     }
 
-    private Vector3 PredictedUnitPosition(Collider unit)
+    private Vector3 DirectionToShoot(Collider unit)
     {
         Vector3 origin = projectileOrigin.position;
-        Vector3 unitClosestPoint = unit.ClosestPoint(origin);
-        Vector3 unitCurrentVelocity = unit.attachedRigidbody.velocity;
+        Vector3 target = unit.ClosestPoint(origin);
+        Vector3 targetVelocity = unit.attachedRigidbody.velocity;
 
-        float distanceToUnit = (unitClosestPoint - origin).magnitude;
-        float projectileTimeToUnit = distanceToUnit / projectileSpeed;
+        float distanceToTarget = (target - origin).magnitude;
+        float timeToTarget = distanceToTarget / projectileSpeed;
         
-        return unitClosestPoint + unitCurrentVelocity * projectileTimeToUnit;
+        Vector3 predictedPosition = target + targetVelocity * timeToTarget;
+
+        float gravityOffset = 0.5f * Physics.gravity.y * timeToTarget * timeToTarget;
+        
+        Vector3 directionToShoot = predictedPosition - shooter.position;
+        directionToShoot.y -= gravityOffset;
+
+        return directionToShoot.normalized;
     }
 
-    private void ShootProjectile(Vector3 shootDirection)
+    private void ShootProjectile(Vector3 direction)
     {
         if (canShoot)
         {
             GameObject projectileGO = Instantiate(projectilePrefab, projectileOrigin);
             projectileGO.transform.SetParent(null);
             Rigidbody projectileRB = projectileGO.GetComponent<Rigidbody>();
-            projectileRB.AddForce(shootDirection * projectileSpeed, ForceMode.VelocityChange);
+            projectileRB.AddForce(direction * projectileSpeed, ForceMode.VelocityChange);
             canShoot = false;
             StartCoroutine(ShootCooldown());
             Destroy(projectileGO, destroyProjectileTime);
@@ -119,5 +124,15 @@ public class Tower : MonoBehaviour
     {
         yield return shootRate;
         canShoot = true;
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (unitToShoot)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawSphere(unitToShoot.ClosestPoint(projectileOrigin.position), 0.3f);
+        }
+        
     }
 }
