@@ -30,24 +30,14 @@ public class Unit : MonoBehaviour
     private bool legsGrounded => Physics.CheckSphere(legs.position, 0.5f, terrainMask);
     private float initialRagdollAngularSpeed => Random.Range(5f, 10f); // this is used when hit by projectile
     private float ragdollRecoveryJumpSpeed => Random.Range(4f, 8f); // increase to increase recovery speed
-    private float ragdollRecoveryRotationSpeed = 300; // in degrees per second (increase to increase recovery speed)
+    private float ragdollRecoveryRotationSpeed = 100; // in degrees per second (increase to increase recovery speed)
     private WaitForSeconds ragdollRecoveryDelay = new WaitForSeconds(1f); // how much time to wait before beginning to recover
 
-    public void Awake()
+    private void Awake()
     {
         selfRigidbody = GetComponent<Rigidbody>();
         selfCollider = GetComponent<Collider>();
     }
-
-    private void FixedUpdate()
-    {
-        // unit turns into ragdoll if and only if feetGrounded == false
-        if (!feetGrounded)
-        {
-            SetRagdoll(true);
-        }
-    }
-
 
     private void OnCollisionEnter(Collision other)
     {
@@ -56,6 +46,14 @@ public class Unit : MonoBehaviour
             SetRagdoll(true);
             selfRigidbody.AddTorque(Random.insideUnitSphere * initialRagdollAngularSpeed, ForceMode.VelocityChange);
         }
+        else if (other.gameObject.layer == LayerMask.NameToLayer("Units"))
+        {
+            if (!other.rigidbody.isKinematic)
+            {
+                SetRagdoll(true);
+            }
+        }
+        
     }
 
     private IEnumerator JumpCoolDown()
@@ -66,6 +64,7 @@ public class Unit : MonoBehaviour
 
     private void Jump(Vector3 velocityChange)
     {
+        // this only works when in ragdoll mode
         if (canJump)
         {
             selfRigidbody.AddForceAtPosition(velocityChange, feet.position, ForceMode.VelocityChange);
@@ -80,13 +79,13 @@ public class Unit : MonoBehaviour
         if (isActive && !isRagdoll)
         {
             isRagdoll = true;
-            selfRigidbody.constraints = RigidbodyConstraints.None;
+            selfRigidbody.isKinematic = false;
             StartCoroutine(RecoverFromRagdoll());
         }
         else if (!isActive && isRagdoll)
         {
             isRagdoll = false;
-            selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+            selfRigidbody.isKinematic = true;
         }
     }
 

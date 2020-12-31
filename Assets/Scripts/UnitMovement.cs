@@ -1,15 +1,11 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Numerics;
 using UnityEngine;
 using UnityEngine.UIElements;
-
-// if moving normally, use Rigidbody.AddForce() with ForceMode.Acceleration
-    // this is like doing selfRigidbody.velocity = 
-    // use ForceMode.Force if you want to take mass into account (try this if units are different sizes)
-// if jumping or dashing, use ForceMode.VelocityChange
-    // this is like doing selfRigidbody.velocity +=
-    // use ForceMode.Impulse if you want to take mass into account
+using Quaternion = UnityEngine.Quaternion;
+using Vector3 = UnityEngine.Vector3;
 
 // how pathfinding will work:
 // enemies will begin by their designated flow field (number of flow fields is equal to number of goals)
@@ -32,8 +28,7 @@ public class UnitMovement : MonoBehaviour
     // map
     private Map map;
     private FlowField flowField;
-    private Node currentNode;
-    
+
     // unit detection
     private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
@@ -42,12 +37,18 @@ public class UnitMovement : MonoBehaviour
     private float avoidanceFOV = 60; // unit must be within this field of view angle to be avoided
 
     // movement (done in FixedUpdate())
-    private float maxMoveSpeed = 10f;
-    
-    // rotation (done in Update())
-    private float maxRotationSpeed = 180; // in degrees per second
+    private Vector3 targetPosition; // position that unit wants to go to
+    private float maxVelocity = 5f; // controls how fast unit can move
+    private float maxAcceleration = 10f; // controls how fast unit can reach max speed/velocity
+    private Vector3 currentVelocity;
+    private Vector3 currentAcceleration;
+
+    private float maxAngularVelocity = 100; // TODO: implement angular kinematics for rotation
+
 
     // steering
+    private float arrivalDistance = 2; // once unit is within this distance of the targetPosition, slow down gradually
+    
     [Serializable]
     public class SteeringWeights
     {
@@ -58,16 +59,11 @@ public class UnitMovement : MonoBehaviour
     private void Awake()
     {
         selfUnit = GetComponent<Unit>();
+        selfRigidbody = selfUnit.selfRigidbody;
+        selfCollider = selfUnit.selfCollider;
         UnitSpawner spawner = GetComponentInParent<UnitSpawner>();
         map = spawner.map;
         flowField = spawner.flowField;
-    }
-
-    private void Start()
-    {
-        selfRigidbody = selfUnit.selfRigidbody;
-        selfCollider = selfUnit.selfCollider;
-        currentNode = map.WorldToNode(transform.position);
     }
 
     private void Update()
@@ -91,20 +87,23 @@ public class UnitMovement : MonoBehaviour
     {
         if (map.grid != null && !selfUnit.isRagdoll)
         {
-            currentNode = map.WorldToNode(transform.position);
-            Vector3 currentVelocity = selfRigidbody.velocity;
-            Vector3 steeredVelocity = SteeredVelocity();
+            // TODO: clean up logic for testing arrival(); also get rid of currentnode == targetndoe in flowfieldsteering
+            // units move by manipulating their acceleration (not velocity)
+            currentAcceleration = SteeredAcceleration(currentAcceleration);
+            currentVelocity += currentAcceleration * Time.deltaTime;
+            currentVelocity = Vector3.ClampMagnitude(currentVelocity, maxVelocity);
+            Arrive();
 
-            // apply velocity to rigidbody
-            Vector3 velocityChange = steeredVelocity - currentVelocity;
-            selfRigidbody.AddForce(velocityChange, ForceMode.Acceleration);
-            
-            // rotate unit so that it faces current velocity (not steered velocity because it hasn't been processed by physics)
-            // also makes sure unit is upright
+            // move unit according to new acceleration and velocity
+            Vector3 positionChange = currentVelocity * Time.deltaTime +
+                                     currentAcceleration * (0.5f * Time.deltaTime * Time.deltaTime);
+            selfRigidbody.MovePosition(transform.position + positionChange);
+
+            // rotate unit so that it faces current velocity; also makes sure unit is upright
             Quaternion moveRotation = Quaternion.RotateTowards(
                 transform.rotation,
                 Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
-                maxRotationSpeed * Time.deltaTime
+                maxAngularVelocity * Time.deltaTime
             );
             selfRigidbody.MoveRotation(moveRotation);
         }
@@ -112,66 +111,75 @@ public class UnitMovement : MonoBehaviour
 
     // MOVEMENT BEHAVIORS (STEERING)
 
-    private Vector3 SteeredVelocity()
+    private void Arrive()
     {
-        Vector3 velocity = selfRigidbody.velocity;
-        Vector3 steering = Vector3.zero;
-        steering += FlowFieldSteering(velocity) * weights.flowField;
-        steering += AvoidUnitsSteering(velocity) * weights.avoidUnits;
-        velocity += steering;
-        
-        if (velocity.sqrMagnitude > maxMoveSpeed * maxMoveSpeed)
+        targetPosition = flowField.targetPosition;
+        float sqrDistance = (targetPosition - transform.position).sqrMagnitude;
+        if (sqrDistance < arrivalDistance * arrivalDistance)
         {
-            velocity = velocity.normalized * maxMoveSpeed;
+            float distance = Mathf.Sqrt(sqrDistance);
+            float scalar = distance / arrivalDistance;
+            currentVelocity *= scalar;
+            currentAcceleration = Vector3.zero;
         }
-
-        return velocity;
     }
     
-    // use this for long distance pathfinding
-    private Vector3 FlowFieldSteering(Vector3 velocityToSteer)
+    private Vector3 SteeredAcceleration(Vector3 accelerationToSteer)
     {
-        Vector3 desiredVelocity;
+        Vector3 steering = Vector3.zero; // change in acceleration
+        steering += FlowFieldSteering(accelerationToSteer) * weights.flowField;
+        steering += AvoidUnitsSteering(accelerationToSteer) * weights.avoidUnits;
+        Vector3 steeredAcceleration = accelerationToSteer + steering;
+        steeredAcceleration = Vector3.ClampMagnitude(steeredAcceleration, maxAcceleration);
+
+        // return the steered acceleration (what the acceleration should be after applied steering behaviors)
+        return steeredAcceleration;
+    }
+
+    // use this for long distance pathfinding
+    private Vector3 FlowFieldSteering(Vector3 accelerationToSteer)
+    {
+        Vector3 currentPosition = transform.position;
+        Node currentNode = map.WorldToNode(currentPosition);
+        
+        Vector3 desiredAcceleration;
         if (currentNode == flowField.targetNode)
         {
             // if currentNode is targetNode, move towards targetPosition located inside targetNode (gradually slow down)
-            desiredVelocity = flowField.targetPosition - transform.position;
+            desiredAcceleration = flowField.targetPosition - currentPosition;
         }
         else
         {
             // if currentNode is NOT targetNode, follow currentNode's flowDirection (max speed)
-            desiredVelocity = currentNode.flowDirection;
-        }
-        
-        if (desiredVelocity.sqrMagnitude > 1)
-        {
-            desiredVelocity.Normalize();
+            desiredAcceleration = currentNode.flowDirection;
         }
 
-        desiredVelocity *= maxMoveSpeed;
-        return desiredVelocity - velocityToSteer; // return the velocity needed to steer towards desired velocity
+        desiredAcceleration *= maxAcceleration;
+        desiredAcceleration = Vector3.ClampMagnitude(desiredAcceleration, maxAcceleration);
+        Vector3 steering = desiredAcceleration - accelerationToSteer;
+        return new Vector3(steering.x, 0, steering.z);
     }
     
     // use this for short distance pathfinding (like following an enemy)
-    private Vector3 SeekSteering(Vector3 velocityToSteer)
+    private Vector3 SeekSteering(Vector3 accelerationToSteer)
     {
         // TODO: IMPLEMENT THIS
         return Vector3.zero;
     }
 
     // use this for short distance pathfinding (like following an enemy)
-    private Vector3 AvoidObstaclesSteering(Vector3 velocityToSteer)
+    private Vector3 AvoidObstaclesSteering(Vector3 accelerationToSteer)
     {
         // TODO: IMPLEMENT THIS
         return Vector3.zero;
     }
     
     // use this for all pathfinding
-    private Vector3 AvoidUnitsSteering(Vector3 velocityToSteer)
+    private Vector3 AvoidUnitsSteering(Vector3 accelerationToSteer)
     {
         if (numUnitsDetected > 1)
         {
-            Vector3 desiredVelocity = Vector3.zero;
+            Vector3 desiredAcceleration = Vector3.zero;
             int numUnitsToAvoid = 0;
             for (int i = 0; i < numUnitsDetected; i++)
             {
@@ -193,7 +201,7 @@ public class UnitMovement : MonoBehaviour
                             numUnitsToAvoid++;
                             // the closer the unitCollider is, the larger the magnitude of awayFromUnit
                             awayFromUnit /= awayFromUnitMagnitude;
-                            desiredVelocity += awayFromUnit;
+                            desiredAcceleration += awayFromUnit;
                         }
                     }
                 }
@@ -201,9 +209,11 @@ public class UnitMovement : MonoBehaviour
             
             if (numUnitsToAvoid > 0)
             {
-                desiredVelocity /= numUnitsToAvoid;
-                desiredVelocity *= maxMoveSpeed;
-                return desiredVelocity - velocityToSteer;
+                desiredAcceleration /= numUnitsToAvoid;
+                desiredAcceleration *= maxAcceleration;
+                Vector3 steering = desiredAcceleration - accelerationToSteer;
+                // only steer on the xy plane
+                return new Vector3(steering.x, 0, steering.z);
             }
         }
 
