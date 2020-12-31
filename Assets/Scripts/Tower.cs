@@ -18,13 +18,13 @@ public class Tower : MonoBehaviour
     // shooting
     private WaitForSeconds shootRate = new WaitForSeconds(1);
     private bool canShoot = true;
-    private float projectileSpeed = 20;
-    private float destroyProjectileTime = 5;
+    private float projectileSpeed = 15;
+    private float destroyProjectileTime = 1;
 
     // unit detection
     private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
-    private float detectionRadius = 30;
+    private float detectionRadius = 15;
 
     private void Update()
     {

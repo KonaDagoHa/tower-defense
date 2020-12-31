@@ -11,6 +11,13 @@ using UnityEngine.UIElements;
     // this is like doing selfRigidbody.velocity +=
     // use ForceMode.Impulse if you want to take mass into account
 
+// how pathfinding will work:
+// enemies will begin by their designated flow field (number of flow fields is equal to number of goals)
+// enemies will also try to avoid other enemy units
+// once enemy detects a friendly unit, enemy will disable FlowFieldSteering() and enable SeekSteering() to go towards friendly unit
+// once friendly unit dies or is out of range, FlowFieldSteering() is enabled and SeekSteering() is disabled
+
+// TODO: fix units shaking when standing still by disabling avoidance under some conditions
 
 [RequireComponent(typeof(Unit))]
 public class UnitMovement : MonoBehaviour
@@ -34,9 +41,11 @@ public class UnitMovement : MonoBehaviour
     private float avoidanceRadius = 2;
     private float avoidanceFOV = 60; // unit must be within this field of view angle to be avoided
 
-    // movement
-    private float maxMoveSpeed = 15f;
-    private float maxRotationSpeed = 200; // in degrees per second
+    // movement (done in FixedUpdate())
+    private float maxMoveSpeed = 10f;
+    
+    // rotation (done in Update())
+    private float maxRotationSpeed = 1000; // in degrees per second
 
     // steering
     [Serializable]
@@ -76,6 +85,19 @@ public class UnitMovement : MonoBehaviour
                     );
             }
         }
+        
+        // rotate unit so that it faces current velocity
+        if (!selfUnit.isRagdoll)
+        {
+            Vector3 velocity = selfRigidbody.velocity;
+            // also makes sure unit is upright
+            Quaternion moveRotation = Quaternion.RotateTowards(
+                transform.rotation,
+                Quaternion.LookRotation(new Vector3(velocity.x, 0, velocity.z)),
+                maxRotationSpeed * Time.deltaTime
+            );
+            selfRigidbody.MoveRotation(moveRotation);
+        }
     }
 
     private void FixedUpdate()
@@ -89,18 +111,6 @@ public class UnitMovement : MonoBehaviour
             Vector3 velocityChange = steeredVelocity - selfRigidbody.velocity;
             selfRigidbody.AddForce(velocityChange, ForceMode.Acceleration);
 
-            // rotate unit so that it faces current velocity
-            // but only if velocity is high enough (reduces shaking rapid when avoiding multiple objects)
-            if (velocityChange.sqrMagnitude > 100)
-            {
-                // also makes sure unit is upright
-                Quaternion moveRotation = Quaternion.RotateTowards(
-                    transform.rotation,
-                    Quaternion.LookRotation(new Vector3(steeredVelocity.x, 0, steeredVelocity.z)),
-                    maxRotationSpeed * Time.deltaTime
-                );
-                selfRigidbody.MoveRotation(moveRotation);
-            }
         }
     }
 
@@ -122,6 +132,7 @@ public class UnitMovement : MonoBehaviour
         return velocity;
     }
     
+    // use this for long distance pathfinding
     private Vector3 FlowFieldSteering(Vector3 velocityToSteer)
     {
         Vector3 desiredVelocity;
@@ -145,6 +156,21 @@ public class UnitMovement : MonoBehaviour
         return desiredVelocity - velocityToSteer; // return the velocity needed to steer towards desired velocity
     }
     
+    // use this for short distance pathfinding (like following an enemy)
+    private Vector3 SeekSteering(Vector3 velocityToSteer)
+    {
+        // TODO: IMPLEMENT THIS
+        return Vector3.zero;
+    }
+
+    // use this for short distance pathfinding (like following an enemy)
+    private Vector3 AvoidObstaclesSteering(Vector3 velocityToSteer)
+    {
+        // TODO: IMPLEMENT THIS
+        return Vector3.zero;
+    }
+    
+    // use this for all pathfinding
     private Vector3 AvoidUnitsSteering(Vector3 velocityToSteer)
     {
         if (numUnitsDetected > 1)

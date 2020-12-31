@@ -29,8 +29,9 @@ public class Unit : MonoBehaviour
     private bool feetGrounded => Physics.CheckSphere(feet.position, 0.05f, terrainMask);
     private bool legsGrounded => Physics.CheckSphere(legs.position, 0.5f, terrainMask);
     private float initialRagdollAngularSpeed => Random.Range(5f, 10f); // this is used when hit by projectile
-    private float ragdollRecoveryJumpSpeed => Random.Range(5f, 10f); // increase to increase recovery speed
-    private float ragdollRecoveryRotationSpeed = 50; // in degrees per second (increase to increase recovery speed)
+    private float ragdollRecoveryJumpSpeed => Random.Range(4f, 8f); // increase to increase recovery speed
+    private float ragdollRecoveryRotationSpeed = 300; // in degrees per second (increase to increase recovery speed)
+    private WaitForSeconds ragdollRecoveryDelay = new WaitForSeconds(1f); // how much time to wait before beginning to recover
 
     public void Awake()
     {
@@ -38,16 +39,12 @@ public class Unit : MonoBehaviour
         selfCollider = GetComponent<Collider>();
     }
 
-    private void FixedUpdate()
+    private void Update()
     {
         // unit turns into ragdoll if and only if feetGrounded == false
-        if (isRagdoll)
+        if (!feetGrounded)
         {
-            RecoverFromRagdoll();
-        }
-        else if (!feetGrounded)
-        {
-            ToggleRagdoll(true);
+            SetRagdoll(true);
         }
     }
 
@@ -56,7 +53,7 @@ public class Unit : MonoBehaviour
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Projectile"))
         {
-            ToggleRagdoll(true);
+            SetRagdoll(true);
             selfRigidbody.AddTorque(Random.insideUnitSphere * initialRagdollAngularSpeed, ForceMode.VelocityChange);
         }
     }
@@ -78,47 +75,61 @@ public class Unit : MonoBehaviour
         
     }
 
-    private void ToggleRagdoll(bool toggleOn)
+    private void SetRagdoll(bool isActive)
     {
-        if (toggleOn && !isRagdoll)
+        if (isActive && !isRagdoll)
         {
             isRagdoll = true;
             selfRigidbody.constraints = RigidbodyConstraints.None;
+            StartCoroutine(RecoverFromRagdoll());
         }
-        else if (!toggleOn && isRagdoll)
+        else if (!isActive && isRagdoll)
         {
             isRagdoll = false;
             selfRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
         }
     }
 
-    private void RecoverFromRagdoll()
+    private IEnumerator RecoverFromRagdoll()
     {
-        if (legsGrounded && canJump)
+        // wait a short time before starting recovery so that isGrounded doesn't immediately return true and turn off ragdoll
+        yield return ragdollRecoveryDelay;
+
+        // strategy for recovery:
+        // (1) jump upward at varying angles in an attempt to get air time (as well as dodge incoming projectiles)
+        // (2) while in air after jumping, rotate self to be upright
+        // (3) once landed, check if feet have touched the ground; if so, exit ragdoll state
+        
+        while (!feetGrounded)
         {
-            // unit will jump upward at slight angles
-            Vector3 jumpDirection = Quaternion.Euler(
-                Random.Range(-45f, 45f),
-                Random.Range(-45f, 45f),
-                Random.Range(-45f, 45f)) * Vector3.up;
-            Vector3 velocityChange = jumpDirection * ragdollRecoveryJumpSpeed;
-            Jump(velocityChange);
-        }
-        else // unit is in air
-        {
-            // unit try to adjust its rotation to be upright (so that feet can touch ground)
-            Quaternion moveRotation = Quaternion.RotateTowards(
-                transform.rotation,
-                Quaternion.Euler(0, transform.eulerAngles.y, 0),
-                ragdollRecoveryRotationSpeed * Time.deltaTime
-            );
-            selfRigidbody.MoveRotation(moveRotation);
+            if (legsGrounded)
+            {
+                if (canJump)
+                {
+                    // unit will jump upward at varying angles
+                    Vector3 jumpDirection = Quaternion.Euler(
+                        Random.Range(-45f, 45f),
+                        Random.Range(-45f, 45f),
+                        Random.Range(-45f, 45f)) * Vector3.up;
+                    Vector3 velocityChange = jumpDirection * ragdollRecoveryJumpSpeed;
+                    Jump(velocityChange);
+                }
+            }
+            else // unit is in air
+            {
+                // unit try to adjust its rotation to be upright (so that feet can touch ground)
+                Quaternion moveRotation = Quaternion.RotateTowards(
+                    transform.rotation,
+                    Quaternion.Euler(0, transform.eulerAngles.y, 0),
+                    ragdollRecoveryRotationSpeed * Time.deltaTime
+                );
+                selfRigidbody.MoveRotation(moveRotation);
+            
+            }
+            yield return null;
         }
         
-        if (feetGrounded)
-        {
-            ToggleRagdoll(false);
-        }
+        SetRagdoll(false);
     }
 
 }
