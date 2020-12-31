@@ -39,7 +39,7 @@ public class Unit : MonoBehaviour
         selfCollider = GetComponent<Collider>();
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
         // unit turns into ragdoll if and only if feetGrounded == false
         if (!feetGrounded)
@@ -126,7 +126,8 @@ public class Unit : MonoBehaviour
                 selfRigidbody.MoveRotation(moveRotation);
             
             }
-            yield return null;
+
+            yield return new WaitForFixedUpdate();
         }
         
         SetRagdoll(false);

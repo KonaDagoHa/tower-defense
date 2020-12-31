@@ -45,7 +45,7 @@ public class UnitMovement : MonoBehaviour
     private float maxMoveSpeed = 10f;
     
     // rotation (done in Update())
-    private float maxRotationSpeed = 1000; // in degrees per second
+    private float maxRotationSpeed = 180; // in degrees per second
 
     // steering
     [Serializable]
@@ -85,19 +85,6 @@ public class UnitMovement : MonoBehaviour
                     );
             }
         }
-        
-        // rotate unit so that it faces current velocity
-        if (!selfUnit.isRagdoll)
-        {
-            Vector3 velocity = selfRigidbody.velocity;
-            // also makes sure unit is upright
-            Quaternion moveRotation = Quaternion.RotateTowards(
-                transform.rotation,
-                Quaternion.LookRotation(new Vector3(velocity.x, 0, velocity.z)),
-                maxRotationSpeed * Time.deltaTime
-            );
-            selfRigidbody.MoveRotation(moveRotation);
-        }
     }
 
     private void FixedUpdate()
@@ -105,12 +92,21 @@ public class UnitMovement : MonoBehaviour
         if (map.grid != null && !selfUnit.isRagdoll)
         {
             currentNode = map.WorldToNode(transform.position);
+            Vector3 currentVelocity = selfRigidbody.velocity;
             Vector3 steeredVelocity = SteeredVelocity();
-            
-            // apply velocity to rigidbody
-            Vector3 velocityChange = steeredVelocity - selfRigidbody.velocity;
-            selfRigidbody.AddForce(velocityChange, ForceMode.Acceleration);
 
+            // apply velocity to rigidbody
+            Vector3 velocityChange = steeredVelocity - currentVelocity;
+            selfRigidbody.AddForce(velocityChange, ForceMode.Acceleration);
+            
+            // rotate unit so that it faces current velocity (not steered velocity because it hasn't been processed by physics)
+            // also makes sure unit is upright
+            Quaternion moveRotation = Quaternion.RotateTowards(
+                transform.rotation,
+                Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
+                maxRotationSpeed * Time.deltaTime
+            );
+            selfRigidbody.MoveRotation(moveRotation);
         }
     }
 
