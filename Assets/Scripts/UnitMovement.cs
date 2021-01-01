@@ -39,8 +39,8 @@ public class UnitMovement : MonoBehaviour
     private float maxSteering = 0.5f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
     private Vector3 currentVelocity;
 
-    private float maxAngularVelocity = 100; // TODO: implement angular kinematics for rotation
-    private float maxAngularSteering = 10;
+    private float maxAngularVelocity = 300;
+    private float maxAngularSteering = 100;
     private float currentAngularVelocity;
 
 
@@ -226,13 +226,13 @@ public class UnitMovement : MonoBehaviour
                 {
                     Vector3 awayFromUnit = transform.position - unitCollider.transform.position;
                     
-                    float awayFromUnitMagnitude = awayFromUnit.magnitude;
+                    float sqrMagnitude = awayFromUnit.sqrMagnitude;
                     // if awayFromUnit is not a zero vector AND the unit is within avoidanceRadius
-                    if (awayFromUnitMagnitude != 0 && awayFromUnitMagnitude <= separationDistance)
+                    if (sqrMagnitude != 0 && sqrMagnitude <= separationDistance * separationDistance)
                     {
                         numUnitsValid++;
                         // scale so that closer to this unit => higher desiredVelocity magnitude
-                        awayFromUnit *= separationDistance / (awayFromUnitMagnitude * awayFromUnitMagnitude);
+                        awayFromUnit *= separationDistance / sqrMagnitude;
                         desiredVelocity += awayFromUnit;
                     }
                 }
