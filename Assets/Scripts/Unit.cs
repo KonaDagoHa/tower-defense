@@ -25,7 +25,7 @@ public class Unit : MonoBehaviour
     private bool canJump = true;
 
     // ragdoll
-    public bool isRagdoll { get; private set; }
+    public bool isRagdoll => !selfRigidbody.isKinematic;
     private bool feetGrounded => Physics.CheckSphere(feet.position, 0.05f, terrainMask);
     private bool legsGrounded => Physics.CheckSphere(legs.position, 0.5f, terrainMask);
     private float initialRagdollAngularSpeed => Random.Range(5f, 10f); // this is used when hit by projectile
@@ -78,13 +78,11 @@ public class Unit : MonoBehaviour
     {
         if (isActive && !isRagdoll)
         {
-            isRagdoll = true;
             selfRigidbody.isKinematic = false;
             StartCoroutine(RecoverFromRagdoll());
         }
         else if (!isActive && isRagdoll)
         {
-            isRagdoll = false;
             selfRigidbody.isKinematic = true;
         }
     }

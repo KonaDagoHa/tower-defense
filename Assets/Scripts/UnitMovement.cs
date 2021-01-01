@@ -13,7 +13,6 @@ using Vector3 = UnityEngine.Vector3;
 // once enemy detects a friendly unit, enemy will disable FlowFieldSteering() and enable SeekSteering() to go towards friendly unit
 // once friendly unit dies or is out of range, FlowFieldSteering() is enabled and SeekSteering() is disabled
 
-// TODO: fix units shaking when standing still by disabling avoidance under some conditions
 
 [RequireComponent(typeof(Unit))]
 public class UnitMovement : MonoBehaviour
@@ -87,17 +86,7 @@ public class UnitMovement : MonoBehaviour
     {
         if (map.grid != null && !selfUnit.isRagdoll)
         {
-            // TODO: clean up logic for testing arrival(); also get rid of currentnode == targetndoe in flowfieldsteering
-            // units move by manipulating their acceleration (not velocity)
-            currentAcceleration = SteeredAcceleration(currentAcceleration);
-            currentVelocity += currentAcceleration * Time.deltaTime;
-            currentVelocity = Vector3.ClampMagnitude(currentVelocity, maxVelocity);
-            Arrive();
-
-            // move unit according to new acceleration and velocity
-            Vector3 positionChange = currentVelocity * Time.deltaTime +
-                                     currentAcceleration * (0.5f * Time.deltaTime * Time.deltaTime);
-            selfRigidbody.MovePosition(transform.position + positionChange);
+            UpdatePosition();
 
             // rotate unit so that it faces current velocity; also makes sure unit is upright
             Quaternion moveRotation = Quaternion.RotateTowards(
@@ -111,17 +100,33 @@ public class UnitMovement : MonoBehaviour
 
     // MOVEMENT BEHAVIORS (STEERING)
 
-    private void Arrive()
+    private void UpdatePosition()
     {
-        targetPosition = flowField.targetPosition;
-        float sqrDistance = (targetPosition - transform.position).sqrMagnitude;
-        if (sqrDistance < arrivalDistance * arrivalDistance)
+        // units move by manipulating their acceleration (not velocity)
+        targetPosition = flowField.targetPosition; // change/delete this later so that targetPosition is not assigned every fixedupdate
+        Vector3 towardsTarget = targetPosition - transform.position;
+        Vector3 towardsTargetXZ = new Vector3(towardsTarget.x, 0, towardsTarget.z); // ignore the y axis
+        
+        // TODO: change this so unit will only go towards targetPosition IF they are not avoiding something
+        // this overwrites avoidance behavior, causing all units to clump together
+        float sqrDistance = towardsTargetXZ.sqrMagnitude;
+        if (sqrDistance <= arrivalDistance * arrivalDistance) // check if unit is within arrival distance
         {
-            float distance = Mathf.Sqrt(sqrDistance);
-            float scalar = distance / arrivalDistance;
-            currentVelocity *= scalar;
-            currentAcceleration = Vector3.zero;
+            currentAcceleration = Vector3.zero; // overwrite acceleration
+            currentVelocity = towardsTargetXZ.normalized * maxVelocity; // go towards target
+            currentVelocity *= Mathf.Sqrt(sqrDistance) / arrivalDistance; // speed decreases as unit approaches targetPosition
         }
+        else
+        {
+            currentAcceleration = SteeredAcceleration(currentAcceleration);
+            currentVelocity += currentAcceleration * Time.deltaTime;
+            currentVelocity = Vector3.ClampMagnitude(currentVelocity, maxVelocity);
+        }
+        
+        // move unit according to new acceleration and velocity
+        Vector3 positionChange = currentVelocity * Time.deltaTime +
+                                 currentAcceleration * (0.5f * Time.deltaTime * Time.deltaTime);
+        selfRigidbody.MovePosition(transform.position + positionChange);
     }
     
     private Vector3 SteeredAcceleration(Vector3 accelerationToSteer)
