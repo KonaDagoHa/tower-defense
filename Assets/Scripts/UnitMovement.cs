@@ -40,6 +40,8 @@ public class UnitMovement : MonoBehaviour
     private Vector3 currentVelocity;
 
     private float maxAngularVelocity = 100; // TODO: implement angular kinematics for rotation
+    private float maxAngularSteering = 10;
+    private float currentAngularVelocity;
 
 
     // steering
@@ -86,7 +88,8 @@ public class UnitMovement : MonoBehaviour
         if (map.grid != null && !selfUnit.isRagdoll)
         {
             UpdatePosition();
-
+            UpdateRotation();
+            /*
             // rotate unit so that it faces current velocity; also makes sure unit is upright
             Quaternion moveRotation = Quaternion.RotateTowards(
                 transform.rotation,
@@ -94,6 +97,7 @@ public class UnitMovement : MonoBehaviour
                 maxAngularVelocity * Time.deltaTime
             );
             selfRigidbody.MoveRotation(moveRotation);
+            */
         }
     }
 
@@ -114,10 +118,25 @@ public class UnitMovement : MonoBehaviour
         Vector3 newVelocity = currentVelocity + steering;
         newVelocity = Vector3.ClampMagnitude(newVelocity, maxVelocity);
 
-        // move unit according to new acceleration and velocity
+        // move unit according to new velocity
         Vector3 positionChange = (currentVelocity + newVelocity) * (0.5f * Time.deltaTime);
         selfRigidbody.MovePosition(transform.position + positionChange);
         currentVelocity = newVelocity;
+    }
+
+    private void UpdateRotation()
+    {
+        Vector3 forward = new Vector3(transform.forward.x, 0, transform.forward.z);
+        float angularSteering = Vector3.SignedAngle(forward, currentVelocity, Vector3.up);
+        angularSteering = Mathf.Clamp(angularSteering, -maxAngularSteering, maxAngularSteering);
+        float newAngularVelocity = currentAngularVelocity + angularSteering;
+        newAngularVelocity = Mathf.Clamp(newAngularVelocity, -maxAngularVelocity, maxAngularVelocity);
+        
+        // rotate unit according to new angular velocity
+        float angleChange = (currentAngularVelocity + newAngularVelocity) * (0.5f * Time.deltaTime);
+        Vector3 newForward = Quaternion.Euler(0, angleChange, 0) * forward;
+        selfRigidbody.MoveRotation(Quaternion.LookRotation(newForward, Vector3.up));
+        currentAngularVelocity = newAngularVelocity;
     }
 
     private Vector3 TotalSteering()
@@ -130,7 +149,7 @@ public class UnitMovement : MonoBehaviour
         }
         
         steering += SeparationSteering() * weights.separation;
-        steering /= 2; // find average length
+        steering /= 3; // find average length
         steering = Vector3.ClampMagnitude(steering, maxSteering);
         return steering;
     }
