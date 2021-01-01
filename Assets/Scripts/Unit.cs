@@ -39,6 +39,11 @@ public class Unit : MonoBehaviour
         selfCollider = GetComponent<Collider>();
     }
 
+    private void Start()
+    {
+        SetRagdoll(true);
+    }
+
     private void OnCollisionEnter(Collision other)
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Projectile"))

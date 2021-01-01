@@ -31,21 +31,21 @@ public class UnitMovement : MonoBehaviour
     // unit detection
     private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
-    private float detectionRadius = 10;
+    private float detectionRadius = 2;
 
     // movement (done in FixedUpdate())
     private Vector3 targetPosition; // position that unit wants to go to
     private float maxVelocity = 5f; // controls how fast unit can move
-    private float maxAcceleration = 10; // controls how fast unit can reach max speed/velocity (lower values produce more curved paths; high values more responsive movement)
+    private float maxSteering = 0.5f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
     private Vector3 currentVelocity;
-    private Vector3 currentAcceleration;
 
     private float maxAngularVelocity = 100; // TODO: implement angular kinematics for rotation
 
 
     // steering
+    private bool isArriving;
     private float arrivalDistance = 2; // once this unit is within this distance of the targetPosition, slow down gradually
-    private float separationDistance = 10; // other units within this distance will trigger the separation steering behavior
+    private float separationDistance = 1; // other units within this distance will trigger the separation steering behavior
 
     [Serializable]
     public class SteeringWeights
@@ -109,41 +109,30 @@ public class UnitMovement : MonoBehaviour
 
     private void UpdatePosition()
     {
-        targetPosition = flowField.targetPosition;
-        // units move by manipulating their acceleration (not velocity)
-        Vector3 towardsTarget = targetPosition - transform.position;
-        Vector3 towardsTargetXZ = new Vector3(towardsTarget.x, 0, towardsTarget.z); // ignore the y axis
-        
-        float sqrDistance = towardsTargetXZ.sqrMagnitude;
-        if (sqrDistance <= arrivalDistance * arrivalDistance) // check if unit is within arrival distance
-        {
-            currentAcceleration = Vector3.zero; // overwrite acceleration
-            currentVelocity = towardsTargetXZ.normalized * maxVelocity; // go towards target
-            currentVelocity *= Mathf.Sqrt(sqrDistance) / arrivalDistance; // speed decreases as unit approaches targetPosition
-        }
-        else
-        {
-            currentAcceleration = SteeredAcceleration();
-            currentVelocity += currentAcceleration * Time.deltaTime;
-            currentVelocity = Vector3.ClampMagnitude(currentVelocity, maxVelocity);
-        }
+        targetPosition = flowField.targetPosition; // delete this later
+        Vector3 steering = TotalSteering();
+        Vector3 newVelocity = currentVelocity + steering;
+        newVelocity = Vector3.ClampMagnitude(newVelocity, maxVelocity);
 
         // move unit according to new acceleration and velocity
-        Vector3 positionChange = currentVelocity * Time.deltaTime +
-                                 currentAcceleration * (0.5f * Time.deltaTime * Time.deltaTime);
+        Vector3 positionChange = (currentVelocity + newVelocity) * (0.5f * Time.deltaTime);
         selfRigidbody.MovePosition(transform.position + positionChange);
+        currentVelocity = newVelocity;
     }
 
-    private Vector3 SteeredAcceleration()
+    private Vector3 TotalSteering()
     {
-        Vector3 steering = Vector3.zero; // change in acceleration
-        steering += FlowFieldSteering() * weights.flowField;
+        Vector3 steering = Vector3.zero; // change in velocity = acceleration * time
+        steering += ArrivalSteering();
+        if (!isArriving)
+        {
+            steering += FlowFieldSteering() * weights.flowField;
+        }
+        
         steering += SeparationSteering() * weights.separation;
-        Vector3 steeredAcceleration = currentAcceleration + steering;
-        steeredAcceleration = Vector3.ClampMagnitude(steeredAcceleration, maxAcceleration);
-
-        // return the steered acceleration (what the acceleration should be after applied steering behaviors)
-        return steeredAcceleration;
+        steering /= 2; // find average length
+        steering = Vector3.ClampMagnitude(steering, maxSteering);
+        return steering;
     }
 
     private Vector3 ArrivalSteering()
@@ -151,13 +140,17 @@ public class UnitMovement : MonoBehaviour
         Vector3 towardsTarget = targetPosition - transform.position;
         Vector3 towardsTargetXZ = new Vector3(towardsTarget.x, 0, towardsTarget.z); // ignore the y axis
         float sqrDistance = towardsTargetXZ.sqrMagnitude;
-        if (sqrDistance <= arrivalDistance * arrivalDistance) // unit is within arrival distance (is arriving)
+        if (sqrDistance <= arrivalDistance * arrivalDistance) // check if unit is within arrival distance
         {
-            currentAcceleration = Vector3.zero; // overwrite acceleration
-            currentVelocity = towardsTargetXZ.normalized * maxVelocity; // go towards target
-            currentVelocity *= Mathf.Sqrt(sqrDistance) / arrivalDistance; // speed decreases as unit approaches targetPosition
+            isArriving = true;
+            Vector3 desiredVelocity = towardsTargetXZ.normalized * maxVelocity;
+            desiredVelocity *= Mathf.Sqrt(sqrDistance) / arrivalDistance; // speed decreases as unit approaches targetPosition
+            Vector3 steering = desiredVelocity - currentVelocity;
+            return new Vector3(steering.x, 0, steering.z);
         }
 
+        isArriving = false;
+        // if this line is reached, unit was NOT within arrival distance
         return Vector3.zero;
     }
 
@@ -167,33 +160,33 @@ public class UnitMovement : MonoBehaviour
         targetPosition = flowField.targetPosition; // change/delete this later
         Vector3 futurePosition = transform.position + currentVelocity * Time.deltaTime; // TODO: adjust future position by change Time.deltaTime to a higher value in seconds
         Node futureNode = map.WorldToNode(futurePosition);
-        Vector3 desiredAcceleration;
-        if (futureNode == flowField.targetNode)
+        Vector3 desiredVelocity;
+        if (futureNode == flowField.targetNode) // this is so unit doesn't just stop at the edge of target node
         {
             // if evaluated node is targetNode, move towards targetPosition located inside targetNode (gradually slow down)
-            desiredAcceleration = targetPosition - futurePosition;
+            desiredVelocity = targetPosition - futurePosition;
         }
         else
         {
             // if evaluated node is NOT targetNode, follow flowDirection (max speed)
-            desiredAcceleration = futureNode.flowDirection;
+            desiredVelocity = futureNode.flowDirection;
         }
 
-        desiredAcceleration *= maxAcceleration;
-        desiredAcceleration = Vector3.ClampMagnitude(desiredAcceleration, maxAcceleration);
-        Vector3 steering = desiredAcceleration - currentAcceleration;
+        desiredVelocity *= maxVelocity;
+        desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
+        Vector3 steering = desiredVelocity - currentVelocity; // change in velocity
         return new Vector3(steering.x, 0, steering.z);
     }
     
     // use this for short distance pathfinding (like following an enemy)
-    private Vector3 SeekSteering(Vector3 accelerationToSteer)
+    private Vector3 SeekSteering()
     {
         // TODO: IMPLEMENT THIS
         return Vector3.zero;
     }
 
     // use this for short distance pathfinding (like following an enemy)
-    private Vector3 AvoidObstaclesSteering(Vector3 accelerationToSteer)
+    private Vector3 AvoidObstaclesSteering()
     {
         // TODO: IMPLEMENT THIS
         return Vector3.zero;
@@ -204,7 +197,7 @@ public class UnitMovement : MonoBehaviour
     {
         if (numUnitsDetected > 1)
         {
-            Vector3 desiredAcceleration = Vector3.zero;
+            Vector3 desiredVelocity = Vector3.zero;
             int numUnitsValid = 0;
             for (int i = 0; i < numUnitsDetected; i++)
             {
@@ -219,18 +212,20 @@ public class UnitMovement : MonoBehaviour
                     if (awayFromUnitMagnitude != 0 && awayFromUnitMagnitude <= separationDistance)
                     {
                         numUnitsValid++;
-                        desiredAcceleration += awayFromUnit;
+                        // scale so that closer to this unit => higher desiredVelocity magnitude
+                        awayFromUnit *= separationDistance / (awayFromUnitMagnitude * awayFromUnitMagnitude);
+                        desiredVelocity += awayFromUnit;
                     }
                 }
             }
             
             if (numUnitsValid > 0)
             {
-                desiredAcceleration /= numUnitsValid; // find average magnitude
-                desiredAcceleration *= maxAcceleration;
-                desiredAcceleration = Vector3.ClampMagnitude(desiredAcceleration, maxAcceleration);
-                Vector3 steering = desiredAcceleration - currentAcceleration;
-                // only steer on the xy plane
+                desiredVelocity /= numUnitsValid; // find average magnitude
+                desiredVelocity *= maxVelocity; // scale to maxVelocity
+                desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
+                Vector3 steering = desiredVelocity - currentVelocity;
+                // only steer on the xz plane
                 return new Vector3(steering.x, 0, steering.z);
             }
         }
