@@ -232,7 +232,7 @@ public class UnitMovement : MonoBehaviour
                     {
                         numUnitsValid++;
                         // scale so that closer to this unit => higher desiredVelocity magnitude
-                        awayFromUnit *= separationDistance / sqrMagnitude;
+                        awayFromUnit /= sqrMagnitude; // this normalizes and scales magnitude to be between 0 and 1
                         desiredVelocity += awayFromUnit;
                     }
                 }
