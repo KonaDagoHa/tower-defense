@@ -13,6 +13,11 @@ using Vector3 = UnityEngine.Vector3;
 // once enemy detects a friendly unit, enemy will disable FlowFieldSteering() and enable SeekSteering() to go towards friendly unit
 // once friendly unit dies or is out of range, FlowFieldSteering() is enabled and SeekSteering() is disabled
 
+// note: some steering behaviors are incompatible (ex: obstacle avoidance and seek/follow flow field)
+// only use obstacle avoidance when pathfinding is not required (ex: wandering and obstacle avoidance)
+
+// right now, the only steering behaviors we need are follow flow field, arrival, and separation (and may cohesion + alignment, needs testing)
+// FIXME: when in a crowd, units sometimes refuse to go through rough terrain even though doing so will be faster
 
 [RequireComponent(typeof(Unit))]
 public class UnitMovement : MonoBehaviour
@@ -38,7 +43,7 @@ public class UnitMovement : MonoBehaviour
     private Vector3 targetPosition; // position that unit wants to go to
     private float maxVelocity = 5f; // controls how fast unit can move
     private float maxSteering = 0.3f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
-    private float maxAngularVelocity = 300; // controls how fast unit rotates (in degrees per second)
+    private float maxAngularVelocity = 200; // controls how fast unit rotates (in degrees per second)
     private Vector3 currentVelocity;
     
     // steering
@@ -47,7 +52,7 @@ public class UnitMovement : MonoBehaviour
     private int steeringCount; // number of steering behaviors active
     private bool isArriving;
     private float arrivalDistance = 2; // once this unit is within this distance of the targetPosition, slow down gradually
-    private float separationDistance = 1.5f; // other units within this distance will trigger the separation steering behavior
+    private float separationDistance = 1; // other units within this distance will trigger the separation steering behavior
 
     [Serializable]
     public class SteeringWeights
@@ -118,11 +123,15 @@ public class UnitMovement : MonoBehaviour
 
     private void UpdateRotation()
     {
+        // the reason why rotation shakes back and forth at low velocities is because the the velocity fluctuates between small negative and positive numbers
+        // trying scaling angularVelocity based on currentVelocity
+
+        float rotationScale = currentVelocity.magnitude / maxVelocity; // angular velocity is highest when velocity is highest
         // rotate unit so that it faces current velocity; also makes sure unit is upright
         Quaternion newRotation = Quaternion.RotateTowards(
             transform.rotation,
             Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
-            maxAngularVelocity * Time.deltaTime
+            maxAngularVelocity * Time.deltaTime * rotationScale
         );
         selfRigidbody.MoveRotation(newRotation);
     }
@@ -138,12 +147,12 @@ public class UnitMovement : MonoBehaviour
             steering += FlowFieldSteering() * weights.flowField;
         }
         steering += SeparationSteering() * weights.separation;
-        steering += CohesionSteering();
         steering /= steeringCount; // find average length
         steering = Vector3.ClampMagnitude(steering, maxSteering);
         return steering;
     }
 
+    // terrain/obstacles steering behaviors
     private Vector3 ArrivalSteering()
     {
         Vector3 towardsTarget = targetPosition - transform.position;
@@ -187,6 +196,7 @@ public class UnitMovement : MonoBehaviour
         return new Vector3(steering.x, 0, steering.z);
     }
 
+    // units steering behaviors
     private Vector3 SeparationSteering()
     {
         if (numUnitsDetected > 1)
