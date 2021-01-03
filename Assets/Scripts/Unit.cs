@@ -46,7 +46,7 @@ public class Unit : MonoBehaviour
 
     private void OnCollisionEnter(Collision other)
     {
-        if (other.gameObject.layer == LayerMask.NameToLayer("Projectile"))
+        if (other.gameObject.layer == LayerMask.NameToLayer("Projectiles"))
         {
             SetRagdoll(true);
             selfRigidbody.AddTorque(Random.insideUnitSphere * initialRagdollAngularSpeed, ForceMode.VelocityChange);
@@ -58,7 +58,6 @@ public class Unit : MonoBehaviour
                 SetRagdoll(true);
             }
         }
-        
     }
 
     private IEnumerator JumpCoolDown()

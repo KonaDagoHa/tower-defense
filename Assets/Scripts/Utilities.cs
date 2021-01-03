@@ -5,7 +5,9 @@ using UnityEngine;
 
 public static class Utilities
 {
-    // returns true if current frame is divisible by n
+    private static int fixedFrameCount => Mathf.RoundToInt(Time.fixedTime / Time.fixedDeltaTime);
+    
+    // call this in Update() only
     public static bool FrameIsDivisibleBy(int n)
     {
         return Time.frameCount % n == 0;

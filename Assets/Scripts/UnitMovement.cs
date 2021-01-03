@@ -18,6 +18,7 @@ using Vector3 = UnityEngine.Vector3;
 public class UnitMovement : MonoBehaviour
 {
     [SerializeField] private LayerMask unitsMask;
+    [SerializeField] private LayerMask obstaclesMask;
     [SerializeField] private SteeringWeights weights = new SteeringWeights();
 
     private Unit selfUnit;
@@ -31,27 +32,27 @@ public class UnitMovement : MonoBehaviour
     // unit detection
     private Collider[] unitsDetected = new Collider[8];
     private int numUnitsDetected;
-    private float detectionRadius = 2;
+    private float unitDetectionRadius = 2;
 
     // movement (done in FixedUpdate())
     private Vector3 targetPosition; // position that unit wants to go to
     private float maxVelocity = 5f; // controls how fast unit can move
-    private float maxSteering = 0.5f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
+    private float maxSteering = 0.3f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
+    private float maxAngularVelocity = 300; // controls how fast unit rotates (in degrees per second)
     private Vector3 currentVelocity;
-
-    private float maxAngularVelocity = 300;
-    private float maxAngularSteering = 100;
-    private float currentAngularVelocity;
-
-
+    
     // steering
+    private Vector3 predictedPosition; // equal to transform.position + currentVelocity * predictedPositionTime
+    private float predictedPositionTime = 0.2f; // how much time in seconds into the future the predicted position will be (should be between 0 and 0.5)
+    private int steeringCount; // number of steering behaviors active
     private bool isArriving;
     private float arrivalDistance = 2; // once this unit is within this distance of the targetPosition, slow down gradually
-    private float separationDistance = 1; // other units within this distance will trigger the separation steering behavior
+    private float separationDistance = 1.5f; // other units within this distance will trigger the separation steering behavior
 
     [Serializable]
     public class SteeringWeights
     {
+        public float arrival = 1;
         public float flowField = 1;
         public float separation = 1;
     }
@@ -75,10 +76,10 @@ public class UnitMovement : MonoBehaviour
                 // get all units within detectionRadius
                 numUnitsDetected = Physics.OverlapSphereNonAlloc(
                     transform.position, 
-                    detectionRadius, 
+                    unitDetectionRadius, 
                     unitsDetected, 
                     unitsMask
-                    );
+                );
             }
         }
     }
@@ -89,15 +90,6 @@ public class UnitMovement : MonoBehaviour
         {
             UpdatePosition();
             UpdateRotation();
-            /*
-            // rotate unit so that it faces current velocity; also makes sure unit is upright
-            Quaternion moveRotation = Quaternion.RotateTowards(
-                transform.rotation,
-                Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
-                maxAngularVelocity * Time.deltaTime
-            );
-            selfRigidbody.MoveRotation(moveRotation);
-            */
         }
     }
 
@@ -126,30 +118,28 @@ public class UnitMovement : MonoBehaviour
 
     private void UpdateRotation()
     {
-        Vector3 forward = new Vector3(transform.forward.x, 0, transform.forward.z);
-        float angularSteering = Vector3.SignedAngle(forward, currentVelocity, Vector3.up);
-        angularSteering = Mathf.Clamp(angularSteering, -maxAngularSteering, maxAngularSteering);
-        float newAngularVelocity = currentAngularVelocity + angularSteering;
-        newAngularVelocity = Mathf.Clamp(newAngularVelocity, -maxAngularVelocity, maxAngularVelocity);
-        
-        // rotate unit according to new angular velocity
-        float angleChange = (currentAngularVelocity + newAngularVelocity) * (0.5f * Time.deltaTime);
-        Vector3 newForward = Quaternion.Euler(0, angleChange, 0) * forward;
-        selfRigidbody.MoveRotation(Quaternion.LookRotation(newForward, Vector3.up));
-        currentAngularVelocity = newAngularVelocity;
+        // rotate unit so that it faces current velocity; also makes sure unit is upright
+        Quaternion newRotation = Quaternion.RotateTowards(
+            transform.rotation,
+            Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
+            maxAngularVelocity * Time.deltaTime
+        );
+        selfRigidbody.MoveRotation(newRotation);
     }
 
     private Vector3 TotalSteering()
     {
+        predictedPosition = transform.position + currentVelocity * predictedPositionTime;
+        steeringCount = 0;
         Vector3 steering = Vector3.zero; // change in velocity = acceleration * time
-        steering += ArrivalSteering();
+        steering += ArrivalSteering() * weights.arrival;
         if (!isArriving)
         {
             steering += FlowFieldSteering() * weights.flowField;
         }
-        
         steering += SeparationSteering() * weights.separation;
-        steering /= 3; // find average length
+        steering += CohesionSteering();
+        steering /= steeringCount; // find average length
         steering = Vector3.ClampMagnitude(steering, maxSteering);
         return steering;
     }
@@ -165,6 +155,7 @@ public class UnitMovement : MonoBehaviour
             Vector3 desiredVelocity = towardsTargetXZ.normalized * maxVelocity;
             desiredVelocity *= Mathf.Sqrt(sqrDistance) / arrivalDistance; // speed decreases as unit approaches targetPosition
             Vector3 steering = desiredVelocity - currentVelocity;
+            steeringCount++;
             return new Vector3(steering.x, 0, steering.z);
         }
 
@@ -173,45 +164,29 @@ public class UnitMovement : MonoBehaviour
         return Vector3.zero;
     }
 
-    // use this for long distance pathfinding
     private Vector3 FlowFieldSteering()
     {
         targetPosition = flowField.targetPosition; // change/delete this later
-        Vector3 futurePosition = transform.position + currentVelocity * Time.deltaTime; // TODO: adjust future position by change Time.deltaTime to a higher value in seconds
-        Node futureNode = map.WorldToNode(futurePosition);
+        Node predictedNode = map.WorldToNode(predictedPosition);
         Vector3 desiredVelocity;
-        if (futureNode == flowField.targetNode) // this is so unit doesn't just stop at the edge of target node
+        if (predictedNode == flowField.targetNode) // this is so unit doesn't just stop at the edge of target node
         {
             // if evaluated node is targetNode, move towards targetPosition located inside targetNode (gradually slow down)
-            desiredVelocity = targetPosition - futurePosition;
+            desiredVelocity = targetPosition - predictedPosition;
         }
         else
         {
             // if evaluated node is NOT targetNode, follow flowDirection (max speed)
-            desiredVelocity = futureNode.flowDirection;
+            desiredVelocity = predictedNode.flowDirection;
         }
 
         desiredVelocity *= maxVelocity;
         desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
         Vector3 steering = desiredVelocity - currentVelocity; // change in velocity
+        steeringCount++;
         return new Vector3(steering.x, 0, steering.z);
     }
-    
-    // use this for short distance pathfinding (like following an enemy)
-    private Vector3 SeekSteering()
-    {
-        // TODO: IMPLEMENT THIS
-        return Vector3.zero;
-    }
 
-    // use this for short distance pathfinding (like following an enemy)
-    private Vector3 AvoidObstaclesSteering()
-    {
-        // TODO: IMPLEMENT THIS
-        return Vector3.zero;
-    }
-    
-    // use this for all pathfinding
     private Vector3 SeparationSteering()
     {
         if (numUnitsDetected > 1)
@@ -241,15 +216,49 @@ public class UnitMovement : MonoBehaviour
             if (numUnitsValid > 0)
             {
                 desiredVelocity /= numUnitsValid; // find average magnitude
-                desiredVelocity *= maxVelocity; // scale to maxVelocity
+                desiredVelocity *= maxVelocity; // scale to maxVelocity (desiredVelocity should now be between 0 and maxVelocity)
                 desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
                 Vector3 steering = desiredVelocity - currentVelocity;
+                steeringCount++;
                 // only steer on the xz plane
                 return new Vector3(steering.x, 0, steering.z);
             }
         }
 
-        // if this statement is reached, it means there were no units within avoidance radius
+        // if this statement is reached, it means there were no units within separation radius
+        return Vector3.zero;
+    }
+
+    // cohesion looks good at higher speeds like 15 but bad for low speeds like 5 
+    // but even at higher speeds, it inhibits movement slightly; try combining this with alignment
+    private Vector3 CohesionSteering()
+    {
+        if (numUnitsDetected > 1)
+        {
+            Vector3 averagePosition = Vector3.zero;
+            int numUnitsValid = 0;
+            for (int i = 0; i < numUnitsDetected; i++)
+            {
+                Collider unitCollider = unitsDetected[i];
+                // if unitCollider does not belong to the unit calling the function
+                if (unitCollider != selfCollider)
+                {
+                    numUnitsValid++;
+                    averagePosition += unitCollider.transform.position;
+                }
+            }
+            
+            if (numUnitsValid > 0)
+            {
+                averagePosition /= numUnitsValid;
+                Vector3 steering = averagePosition - transform.position;
+                steeringCount++;
+                // only steer on the xz plane
+                return new Vector3(steering.x, 0, steering.z);
+            }
+        }
+
+        // if this statement is reached, it means there were no units within separation radius
         return Vector3.zero;
     }
 

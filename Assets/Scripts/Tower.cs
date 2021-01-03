@@ -16,7 +16,7 @@ public class Tower : MonoBehaviour
     private Collider unitToShoot;
 
     // shooting
-    private WaitForSeconds shootRate = new WaitForSeconds(1);
+    private WaitForSeconds shootRate = new WaitForSeconds(0.1f);
     private bool canShoot = true;
     private float projectileSpeed = 15;
     private float destroyProjectileTime = 1;

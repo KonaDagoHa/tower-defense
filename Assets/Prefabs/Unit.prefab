@@ -258,9 +258,13 @@ MonoBehaviour:
   unitsMask:
     serializedVersion: 2
     m_Bits: 2048
+  obstaclesMask:
+    serializedVersion: 2
+    m_Bits: 8192
   weights:
+    arrival: 1
     flowField: 1
-    separation: 1
+    separation: 10
 --- !u!136 &3251834414880016050
 CapsuleCollider:
   m_ObjectHideFlags: 0

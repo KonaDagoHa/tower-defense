@@ -9,13 +9,14 @@ public class UnitSpawner : MonoBehaviour
     [SerializeField] private GameObject unitPrefab;
     public Map map;
     public FlowField flowField;
+    [SerializeField] private int spawnCount;
 
 
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            SpawnUnits(1);
+            SpawnUnits(spawnCount);
         }
     }
 
