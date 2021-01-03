@@ -23,7 +23,6 @@ using Vector3 = UnityEngine.Vector3;
 public class UnitMovement : MonoBehaviour
 {
     [SerializeField] private LayerMask unitsMask;
-    [SerializeField] private LayerMask obstaclesMask;
     [SerializeField] private SteeringWeights weights = new SteeringWeights();
 
     private Unit selfUnit;
@@ -43,7 +42,7 @@ public class UnitMovement : MonoBehaviour
     private Vector3 targetPosition; // position that unit wants to go to
     private float maxVelocity = 5f; // controls how fast unit can move
     private float maxSteering = 0.3f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
-    private float maxAngularVelocity = 200; // controls how fast unit rotates (in degrees per second)
+    private float maxAngularVelocity = 300; // controls how fast unit rotates (in degrees per second)
     private Vector3 currentVelocity;
     
     // steering
@@ -123,17 +122,19 @@ public class UnitMovement : MonoBehaviour
 
     private void UpdateRotation()
     {
-        // the reason why rotation shakes back and forth at low velocities is because the the velocity fluctuates between small negative and positive numbers
-        // trying scaling angularVelocity based on currentVelocity
-
-        float rotationScale = currentVelocity.magnitude / maxVelocity; // angular velocity is highest when velocity is highest
         // rotate unit so that it faces current velocity; also makes sure unit is upright
-        Quaternion newRotation = Quaternion.RotateTowards(
-            transform.rotation,
-            Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
-            maxAngularVelocity * Time.deltaTime * rotationScale
-        );
-        selfRigidbody.MoveRotation(newRotation);
+        float sqrVelocity = currentVelocity.sqrMagnitude;
+        if (sqrVelocity > 1)
+        {
+            float rotationScale = sqrVelocity / (maxVelocity * maxVelocity); // angular velocity is highest when velocity is highest
+            Quaternion newRotation = Quaternion.RotateTowards(
+                transform.rotation,
+                Quaternion.LookRotation(new Vector3(currentVelocity.x, 0, currentVelocity.z)),
+                maxAngularVelocity * Time.deltaTime * rotationScale
+            );
+            selfRigidbody.MoveRotation(newRotation);
+        }
+        
     }
 
     private Vector3 TotalSteering()
@@ -141,15 +142,22 @@ public class UnitMovement : MonoBehaviour
         predictedPosition = transform.position + currentVelocity * predictedPositionTime;
         steeringCount = 0;
         Vector3 steering = Vector3.zero; // change in velocity = acceleration * time
+        
         steering += ArrivalSteering() * weights.arrival;
+        steering += SeparationSteering() * weights.separation;
         if (!isArriving)
         {
             steering += FlowFieldSteering() * weights.flowField;
         }
-        steering += SeparationSteering() * weights.separation;
-        steering /= steeringCount; // find average length
-        steering = Vector3.ClampMagnitude(steering, maxSteering);
-        return steering;
+        
+        
+        if (steeringCount > 0)
+        {
+            steering /= steeringCount; // find average length
+            steering = Vector3.ClampMagnitude(steering, maxSteering);
+            return steering;
+        }
+        return Vector3.zero;
     }
 
     // terrain/obstacles steering behaviors
@@ -158,11 +166,13 @@ public class UnitMovement : MonoBehaviour
         Vector3 towardsTarget = targetPosition - transform.position;
         Vector3 towardsTargetXZ = new Vector3(towardsTarget.x, 0, towardsTarget.z); // ignore the y axis
         float sqrDistance = towardsTargetXZ.sqrMagnitude;
-        if (sqrDistance <= arrivalDistance * arrivalDistance) // check if unit is within arrival distance
+        float sqrArrivalDistance = arrivalDistance * arrivalDistance;
+        if (sqrDistance <= sqrArrivalDistance) // check if unit is within arrival distance
         {
             isArriving = true;
             Vector3 desiredVelocity = towardsTargetXZ.normalized * maxVelocity;
-            desiredVelocity *= Mathf.Sqrt(sqrDistance) / arrivalDistance; // speed decreases as unit approaches targetPosition
+            desiredVelocity *= sqrDistance / sqrArrivalDistance; // speed decreases exponentially as unit approaches targetPosition
+            // calculate steering
             Vector3 steering = desiredVelocity - currentVelocity;
             steeringCount++;
             return new Vector3(steering.x, 0, steering.z);
@@ -191,12 +201,30 @@ public class UnitMovement : MonoBehaviour
 
         desiredVelocity *= maxVelocity;
         desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
+        // calculate steering
         Vector3 steering = desiredVelocity - currentVelocity; // change in velocity
-        steeringCount++;
-        return new Vector3(steering.x, 0, steering.z);
+        if (steering != Vector3.zero)
+        {
+            steeringCount++;
+            return new Vector3(steering.x, 0, steering.z);
+        }
+
+        return Vector3.zero;
     }
 
     // units steering behaviors
+
+    private Vector3 QueueSteering()
+    {
+        return Vector3.zero;
+    }
+    
+    private Vector3 AvoidUnitsSteering()
+    {
+
+        return Vector3.zero;
+    }
+    
     private Vector3 SeparationSteering()
     {
         if (numUnitsDetected > 1)
@@ -225,13 +253,17 @@ public class UnitMovement : MonoBehaviour
             
             if (numUnitsValid > 0)
             {
-                desiredVelocity /= numUnitsValid; // find average magnitude
+                desiredVelocity /= numUnitsValid; // find average magnitude (desiredVelocity is now between 0 and 1)
                 desiredVelocity *= maxVelocity; // scale to maxVelocity (desiredVelocity should now be between 0 and maxVelocity)
                 desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
                 Vector3 steering = desiredVelocity - currentVelocity;
-                steeringCount++;
-                // only steer on the xz plane
-                return new Vector3(steering.x, 0, steering.z);
+                if (steering != Vector3.zero)
+                {
+                    steeringCount++;
+                    return new Vector3(steering.x, 0, steering.z);
+                }
+
+                return Vector3.zero;
             }
         }
 
@@ -262,6 +294,8 @@ public class UnitMovement : MonoBehaviour
             {
                 averagePosition /= numUnitsValid;
                 Vector3 steering = averagePosition - transform.position;
+                steering /= steering.sqrMagnitude;
+                steering *= maxSteering;
                 steeringCount++;
                 // only steer on the xz plane
                 return new Vector3(steering.x, 0, steering.z);
