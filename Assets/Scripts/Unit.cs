@@ -51,6 +51,7 @@ public class Unit : MonoBehaviour
             SetRagdoll(true);
             selfRigidbody.AddTorque(Random.insideUnitSphere * initialRagdollAngularSpeed, ForceMode.VelocityChange);
         }
+        /*
         else if (other.gameObject.layer == LayerMask.NameToLayer("Units"))
         {
             if (!other.rigidbody.isKinematic)
@@ -58,6 +59,7 @@ public class Unit : MonoBehaviour
                 SetRagdoll(true);
             }
         }
+        */
     }
 
     private IEnumerator JumpCoolDown()

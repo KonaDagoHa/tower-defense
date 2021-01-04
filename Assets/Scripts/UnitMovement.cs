@@ -41,6 +41,7 @@ public class UnitMovement : MonoBehaviour
     private float maxSteering = 0.3f; // controls how fast unit gets to maxVelocity (change in velocity = acceleration * time)
     private float maxAngularVelocity = 250; // controls how fast unit rotates (in degrees per second)
     private Vector3 currentVelocity;
+    private Vector3 previousPosition;
     
     // steering behaviors
     private Collider[] unitsDetected = new Collider[8];
@@ -54,10 +55,10 @@ public class UnitMovement : MonoBehaviour
     private float flowFieldPredictionTime = 0.2f; // how much time in seconds into the future the predicted position will be (between 0 and 0.5 works well)
     // queue
     private bool isQueueing;
-    private float queueAheadDistance = 1f; // Vector3 ahead = transform.forward * queueAheadDistance (distance ahead of unit)
-    private float queueRadius = 0.7f;
+    private float queueAheadDistance = 0.5f; // Vector3 ahead = transform.forward * queueAheadDistance (distance ahead of unit)
+    private float queueRadius = 1;
     // separation
-    private float separationRadius = 1.5f; // other units within this distance will trigger the separation steering behavior
+    private float separationRadius = 1f; // other units within this distance will trigger the separation steering behavior
 
     [Serializable]
     public class SteeringWeights
@@ -80,7 +81,7 @@ public class UnitMovement : MonoBehaviour
 
     private void Update()
     {
-        if (Utilities.FrameIsDivisibleBy(30))
+        if (Utilities.FrameIsDivisibleBy(10))
         {
             if (!selfUnit.isRagdoll)
             {
@@ -97,6 +98,7 @@ public class UnitMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        previousPosition = transform.position;
         if (map.grid != null && !selfUnit.isRagdoll)
         {
             UpdatePosition();
@@ -150,17 +152,16 @@ public class UnitMovement : MonoBehaviour
         Vector3 steering = Vector3.zero; // change in velocity = acceleration * time
         
         steering += QueueSteering() * weights.queue; // this also updates isQueueing
-        if (!isQueueing) // queueing overwrites all other behaviors
+        steering += SeparationSteering() * weights.separation;
+        
+        if (!isQueueing)
         {
             steering += ArrivalSteering() * weights.arrival; // this also updates isArriving
             if (!isArriving) // is moving according to flow field
             {
                 steering += FlowFieldSteering() * weights.flowField;
-                steering += SeparationSteering() * weights.separation;
             }
         }
-        
-
 
         if (steeringCount > 0)
         {
@@ -196,7 +197,6 @@ public class UnitMovement : MonoBehaviour
 
     private Vector3 FlowFieldSteering()
     {
-        targetPosition = flowField.targetPosition; // change/delete this later
         Vector3 predictedPosition = transform.position + currentVelocity * flowFieldPredictionTime;
         Node predictedNode = map.WorldToNode(predictedPosition);
         Vector3 desiredVelocity;
@@ -236,10 +236,18 @@ public class UnitMovement : MonoBehaviour
                 Collider unitCollider = unitsDetected[i];
                 if (unitCollider != selfCollider)
                 {
-                    Vector3 aheadToUnit = unitCollider.transform.position - ahead;
+                    Vector3 unitPosition = unitCollider.transform.position;
+                    Vector3 aheadToUnit = unitPosition - ahead;
+                    //Vector3 selfToUnit = unitPosition - transform.position;
+                    // slow down to zero velocity if there is a unit ahead of self
                     if (aheadToUnit.sqrMagnitude <= queueRadius * queueRadius)
                     {
-                        // slow down to zero velocity if there is a unit ahead of self
+                        /*
+                        if (selfToUnit.sqrMagnitude <= queueRadius * queueRadius) // unit is very close to self (crowded)
+                        {
+                            currentVelocity *= 0.3f;
+                        }
+                        */
                         Vector3 steering = -currentVelocity;
                         if (steering != Vector3.zero)
                         {
@@ -295,43 +303,6 @@ public class UnitMovement : MonoBehaviour
                 desiredVelocity *= maxVelocity; // scale to maxVelocity (desiredVelocity should now be between 0 and maxVelocity)
                 desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxVelocity);
                 Vector3 steering = desiredVelocity - currentVelocity;
-                if (steering != Vector3.zero)
-                {
-                    steeringCount++;
-                    return new Vector3(steering.x, 0, steering.z);
-                }
-
-                return Vector3.zero;
-            }
-        }
-
-        // if this statement is reached, it means there were no units within separation radius
-        return Vector3.zero;
-    }
-
-    // cohesion looks good at higher speeds like 15 but bad for low speeds like 5 
-    // but even at higher speeds, it inhibits movement slightly; try combining this with alignment
-    private Vector3 CohesionSteering()
-    {
-        if (numUnitsDetected > 1)
-        {
-            Vector3 averagePosition = Vector3.zero;
-            int numUnitsValid = 0;
-            for (int i = 0; i < numUnitsDetected; i++)
-            {
-                Collider unitCollider = unitsDetected[i];
-                // if unitCollider does not belong to the unit calling the function
-                if (unitCollider != selfCollider)
-                {
-                    numUnitsValid++;
-                    averagePosition += unitCollider.transform.position;
-                }
-            }
-            
-            if (numUnitsValid > 0)
-            {
-                averagePosition /= numUnitsValid;
-                Vector3 steering = averagePosition - transform.position;
                 if (steering != Vector3.zero)
                 {
                     steeringCount++;
