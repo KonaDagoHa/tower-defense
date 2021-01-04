@@ -1445,7 +1445,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mapSize: {x: 35, y: 35}
-  nodeRadius: 0.5
+  nodeRadius: 0.4
 --- !u!4 &1476419405
 Transform:
   m_ObjectHideFlags: 0

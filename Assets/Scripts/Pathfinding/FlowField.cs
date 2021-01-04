@@ -44,7 +44,7 @@ public class FlowField : MonoBehaviour
     {
         public const byte defaultTerrain = 1;
         public const byte impassableTerrain = byte.MaxValue;
-        public const byte roughTerrain = 4;
+        public const byte roughTerrain = 2;
     }
 
     private void Awake()
